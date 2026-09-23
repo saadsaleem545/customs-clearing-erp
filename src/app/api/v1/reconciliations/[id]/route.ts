@@ -1,52 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-// DELETE /api/v1/reconciliations/[id] - Delete single reconciliation item
 export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const { id } = params;
-
     if (!id) {
-      return NextResponse.json(
-        { success: false, error: 'Reconciliation Item ID is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: 'ID is required' }, { status: 400 });
     }
 
-    // Check if item exists
-    const item = await prisma.reconciliationItem.findUnique({
-      where: { id },
-    });
-
-    if (!item) {
-      return NextResponse.json(
-        { success: false, error: 'Reconciliation item not found' },
-        { status: 404 }
-      );
-    }
-
-    // Delete the specific item from database
     await prisma.reconciliationItem.delete({
       where: { id },
     });
 
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Reconciliation item deleted successfully' 
-    });
+    return NextResponse.json({ success: true, message: 'Deleted successfully' });
   } catch (error: any) {
-    console.error('DELETE Error:', error);
-    return NextResponse.json(
-      { success: false, error: error.message || 'Internal Server Error' }, 
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
 
-// PUT /api/v1/reconciliations/[id] - Update single reconciliation item manually
 export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -57,10 +31,7 @@ export async function PUT(
     const { exportQtyKg, exportValuePkr, consumptionIncWastage, actualWastageKg } = body;
 
     if (!id) {
-      return NextResponse.json(
-        { success: false, error: 'Reconciliation Item ID is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: 'ID is required' }, { status: 400 });
     }
 
     const existingItem = await prisma.reconciliationItem.findUnique({
@@ -68,33 +39,44 @@ export async function PUT(
     });
 
     if (!existingItem) {
-      return NextResponse.json(
-        { success: false, error: 'Reconciliation item not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ success: false, error: 'Item not found' }, { status: 404 });
     }
 
-    const updateData: any = {};
-    if (exportQtyKg !== undefined && exportQtyKg !== '') updateData.exportQtyKg = Number(exportQtyKg);
-    if (exportValuePkr !== undefined && exportValuePkr !== '') updateData.exportValuePkr = Number(exportValuePkr);
-    if (consumptionIncWastage !== undefined && consumptionIncWastage !== '') updateData.consumptionIncWastage = Number(consumptionIncWastage);
-    if (actualWastageKg !== undefined && actualWastageKg !== '') updateData.actualWastageKg = Number(actualWastageKg);
+    const expQty = Number(exportQtyKg ?? existingItem.exportQtyKg ?? 0);
+    const expVal = Number(exportValuePkr ?? existingItem.exportValuePkr ?? 0);
+    const totalConsumed = Number(consumptionIncWastage ?? existingItem.consumptionIncWastage ?? 0);
+    const wastageKg = Number(actualWastageKg ?? (existingItem as any).actualWastageKg ?? 0);
+
+    const importQty = Number((existingItem as any).importQty ?? existingItem.importQtyKg ?? 0);
+    const importVal = Number((existingItem as any).importValue ?? existingItem.importValuePkr ?? 0);
+
+    const closingBalanceKg = importQty - totalConsumed;
+    const unitRate = importQty > 0 ? importVal / importQty : 0;
+    const consumedVal = unitRate * totalConsumed;
+    const valueAddition = expVal > 0 ? (consumedVal / expVal) * 100 : 0;
+
+    const updateData: any = {
+      exportQtyKg: expQty,
+      exportValuePkr: expVal,
+      consumptionIncWastage: totalConsumed,
+      closingBalance: closingBalanceKg,
+      valueAddition: valueAddition,
+    };
+
+    if ('actualWastageKg' in existingItem) {
+      updateData.actualWastageKg = wastageKg;
+    }
+    if ('wastageQty' in existingItem) {
+      updateData.wastageQty = wastageKg;
+    }
 
     const updatedItem = await prisma.reconciliationItem.update({
       where: { id },
       data: updateData,
     });
 
-    return NextResponse.json({ 
-      success: true, 
-      data: updatedItem, 
-      message: 'Reconciliation item updated successfully' 
-    });
+    return NextResponse.json({ success: true, data: updatedItem, message: 'Updated successfully' });
   } catch (error: any) {
-    console.error('PUT Error:', error);
-    return NextResponse.json(
-      { success: false, error: error.message || 'Internal Server Error' }, 
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
