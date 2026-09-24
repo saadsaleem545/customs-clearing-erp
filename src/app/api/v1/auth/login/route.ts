@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma'; // <-- Apne shared prisma instance ko import karein
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
@@ -7,21 +7,18 @@ export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const runtime = 'nodejs';
 
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'default_secure_jwt_secret_key';
 
-// Brute-force Protection: In-memory IP tracking map (IP -> { count, lockUntil })
+// Brute-force Protection: In-memory IP tracking map
 const attemptTracker = new Map<string, { count: number; lockUntil: number }>();
 const MAX_ATTEMPTS = 5;
 const LOCK_TIME_MS = 15 * 60 * 1000; // 15 minutes lockout
 
 export async function POST(req: Request) {
-  // Get client IP address for rate limiting
   const forwardedFor = req.headers.get('x-forwarded-for');
   const ip = forwardedFor ? forwardedFor.split(',')[0].trim() : '127.0.0.1';
   const now = Date.now();
 
-  // 1. Check if IP is currently rate-limited
   const record = attemptTracker.get(ip);
   if (record && record.lockUntil > now) {
     const minutesLeft = Math.ceil((record.lockUntil - now) / 60000);
@@ -42,18 +39,15 @@ export async function POST(req: Request) {
       where: { email },
     });
 
-    // 2. Handle Invalid User or Inactive Account
     if (!user || !user.isActive) {
       trackFailedAttempt(ip);
       return NextResponse.json({ success: false, error: 'Invalid credentials or inactive account' }, { status: 401 });
     }
 
-    // 3. Verify Password securely with bcrypt
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
       trackFailedAttempt(ip);
 
-      // Record Failed Login in Audit Log
       await prisma.auditLog.create({
         data: {
           userId: user.id,
@@ -62,15 +56,13 @@ export async function POST(req: Request) {
           entityId: user.id,
           ipAddress: ip,
         },
-      }).catch(() => {}); // Catch silent logging errors
+      }).catch(() => {});
 
       return NextResponse.json({ success: false, error: 'Invalid credentials' }, { status: 401 });
     }
 
-    // Clear failed attempts on successful login
     attemptTracker.delete(ip);
 
-    // 4. Record Successful Login in Audit Log
     await prisma.auditLog.create({
       data: {
         userId: user.id,
@@ -81,7 +73,6 @@ export async function POST(req: Request) {
       },
     }).catch(() => {});
 
-    // 5. Generate Bank-Grade JWT Token (Expires in 8 Hours) - Includes name
     const token = jwt.sign(
       { userId: user.id, name: user.name, email: user.email, role: user.role },
       JWT_SECRET,
@@ -94,7 +85,6 @@ export async function POST(req: Request) {
       user: { id: user.id, name: user.name, email: user.email, role: user.role }
     });
 
-    // 6. Set Secure HTTP-Only Cookies
     response.cookies.set({
       name: 'auth_token',
       value: token,
@@ -102,7 +92,7 @@ export async function POST(req: Request) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
       path: '/',
-      maxAge: 60 * 60 * 8, // 8 hours
+      maxAge: 60 * 60 * 8,
     });
 
     response.cookies.set({
@@ -114,7 +104,6 @@ export async function POST(req: Request) {
       maxAge: 60 * 60 * 8,
     });
 
-    // Cookie mein user_name bhi set karein
     response.cookies.set({
       name: 'user_name',
       value: user.name,
@@ -131,7 +120,6 @@ export async function POST(req: Request) {
   }
 }
 
-// Helper function to track failed login attempts per IP
 function trackFailedAttempt(ip: string) {
   const now = Date.now();
   const record = attemptTracker.get(ip);
@@ -140,7 +128,7 @@ function trackFailedAttempt(ip: string) {
   } else {
     record.count += 1;
     if (record.count >= MAX_ATTEMPTS) {
-      record.lockUntil = now + LOCK_TIME_MS; // Lock for 15 minutes
+      record.lockUntil = now + LOCK_TIME_MS;
     }
   }
 }
