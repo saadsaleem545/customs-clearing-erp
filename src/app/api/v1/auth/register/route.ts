@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 
-const prisma = new PrismaClient();
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const runtime = 'nodejs';
 
 export async function POST(req: Request) {
   try {
@@ -30,7 +32,7 @@ export async function POST(req: Request) {
         name,
         email,
         passwordHash: hashedPassword,
-        role: 'SUPER_ADMIN', // Pehla register karne wala ya admin SUPER_ADMIN ban sakta hai
+        role: 'SUPER_ADMIN',
         isActive: true,
       },
     });
