@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 export const runtime = 'nodejs';
 
 const prisma = new PrismaClient();
