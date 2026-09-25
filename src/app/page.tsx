@@ -69,9 +69,6 @@ export default function LoginPage() {
 
         {/* Center Main Value Proposition */}
         <div className="relative z-10 my-12 lg:my-0 space-y-6 max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-bold tracking-wide uppercase">
-            <ShieldCheck className="w-4 h-4" /> WeBOC &amp; FBR-Ready Operations
-          </div>
           
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-none">
             Digital customs clearing that keeps your logistics moving.
@@ -89,7 +86,7 @@ export default function LoginPage() {
               </div>
               <h3 className="text-sm font-black text-white">Compliant Declarations</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Seamless structured Goods Declarations and Form-E audit ledgers.
+                Seamless structured Goods Declarations.
               </p>
             </div>
 
@@ -99,7 +96,7 @@ export default function LoginPage() {
               </div>
               <h3 className="text-sm font-black text-white">Clear Workflow</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Track live import/export clearances and real-time inventory balances.
+                Track live import/export clearances.
               </p>
             </div>
           </div>
@@ -108,9 +105,6 @@ export default function LoginPage() {
         {/* Footer Note */}
         <div className="relative z-10 pt-6 border-t border-white/10 text-xs text-slate-400 font-medium flex items-center justify-between">
           <span>Secure access for authorized logistics teams only.</span>
-          <span className="text-emerald-400 font-mono font-bold flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> EFS Engine Online
-          </span>
         </div>
       </div>
 
