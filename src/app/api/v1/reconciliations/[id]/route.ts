@@ -47,36 +47,30 @@ export async function PUT(
     const totalConsumed = Number(consumptionIncWastage ?? existingItem.consumptionIncWastage ?? 0);
     const wastageKg = Number(actualWastageKg ?? (existingItem as any).actualWastageKg ?? 0);
 
-    const importQty = Number((existingItem as any).importQty ?? existingItem.importQtyKg ?? 0);
-    const importVal = Number((existingItem as any).importValue ?? existingItem.importValuePkr ?? 0);
+    const importQty = Number(existingItem.importQtyKg ?? 0);
+    const importVal = Number(existingItem.importValuePkr ?? 0);
 
     const closingBalanceKg = importQty - totalConsumed;
     const unitRate = importQty > 0 ? importVal / importQty : 0;
     const consumedVal = unitRate * totalConsumed;
     const valueAddition = expVal > 0 ? (consumedVal / expVal) * 100 : 0;
 
-    const updateData: any = {
-      exportQtyKg: expQty,
-      exportValuePkr: expVal,
-      consumptionIncWastage: totalConsumed,
-      closingBalance: closingBalanceKg,
-      valueAddition: valueAddition,
-    };
-
-    if ('actualWastageKg' in existingItem) {
-      updateData.actualWastageKg = wastageKg;
-    }
-    if ('wastageQty' in existingItem) {
-      updateData.wastageQty = wastageKg;
-    }
-
+    // Strict payload matching exact prisma schema fields only
     const updatedItem = await prisma.reconciliationItem.update({
       where: { id },
-      data: updateData,
+      data: {
+        exportQtyKg: expQty,
+        exportValuePkr: expVal,
+        consumptionIncWastage: totalConsumed,
+        actualWastageKg: wastageKg,
+        closingBalanceKg: closingBalanceKg,
+        valueAddition: valueAddition,
+      },
     });
 
     return NextResponse.json({ success: true, data: updatedItem, message: 'Updated successfully' });
   } catch (error: any) {
+    console.error('Update reconciliation error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

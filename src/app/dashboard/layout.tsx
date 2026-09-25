@@ -19,7 +19,7 @@ export default async function DashboardLayout({
     redirect('/');
   }
 
-  let userName = 'Saad Saleem';
+  let userName = 'Muhammad Saleem';
   let userRole = 'SUPER_ADMIN';
 
   try {

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
-import { Upload, Plus, Trash2, Save, Loader2, FileSpreadsheet, Edit3, X } from 'lucide-react';
+import { Upload, Plus, Trash2, Save, Loader2, FileSpreadsheet, Edit3, X, Search, RefreshCw, ArrowDownLeft, CheckCircle2, ShieldCheck, Filter, Printer } from 'lucide-react';
 
 export default function ImportGdForm() {
   const [activeTab, setActiveTab] = useState<'auto' | 'manual'>('auto');
@@ -11,10 +11,14 @@ export default function ImportGdForm() {
   const [items, setItems] = useState<any[]>([]);
   const [savedImports, setSavedImports] = useState<any[]>([]);
   const [selectedGdItems, setSelectedGdItems] = useState<{ items: any[]; gdNumber: string; partyName?: string } | null>(null);
-  const [partyPrintModal, setPartyPrintModal] = useState<{ partyName: string; allItems: any[] } | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [historySearch, setHistorySearch] = useState('');
+
+  // Advanced Filter States for History Section
+  const [filterPartyId, setFilterPartyId] = useState('');
+  const [filterFromDate, setFilterFromDate] = useState('');
+  const [filterToDate, setFilterToDate] = useState('');
 
   // Manual Form States
   const [selectedManualPartyId, setSelectedManualPartyId] = useState('');
@@ -90,56 +94,70 @@ export default function ImportGdForm() {
         setExtractedPartyName(detectedImporter || 'SHIWANI TEXTILE');
 
         const parsedItems = [];
-        let currentGdNumber = '';
 
         for (let i = 2; i < data.length; i++) {
           const row = data[i];
           if (row && row.length > 0) {
-            for (let c = 0; c < row.length; c++) {
-              const val = String(row[c] || '').trim();
-              if (val.length > 5 && (val.includes('-') || val.includes('FS') || val.includes('KP') || val.includes('IM'))) {
-                if (val !== 'PARTICULARS' && !val.includes('HS CODE')) {
-                  currentGdNumber = val;
-                  break;
-                }
-              }
-            }
-
-            if (!currentGdNumber && row[0]) {
-              currentGdNumber = String(row[0]).trim();
-            }
-
+            let gdNumber = '';
+            let gdDateVal = '';
             let particulars = '';
             let hsCode = '';
             let qty = 0;
             let uom = 'KG';
             let value = 0;
 
-            if (row.length >= 6) {
-              particulars = String(row[1] || row[2] || '').trim();
-              hsCode = String(row[2] || row[3] || '').trim();
-              qty = Number(row[3] || row[4] || 0);
-              uom = String(row[4] || row[5] || 'KG').trim();
-              value = Number(row[5] || row[6] || 0);
-            } else {
-              particulars = String(row[1] || row[0] || '').trim();
+            const nonEmpCols = row.filter((cell: any) => String(cell || '').trim() !== '');
+            if (nonEmpCols.length < 3) continue;
+
+            for (let c = 0; c < row.length; c++) {
+              const val = String(row[c] || '').trim();
+              if (!val || val === 'PARTICULARS' || val === 'GD NO.' || val === 'DATE') continue;
+
+              if (!gdNumber && (val.includes('-') || val.length > 6) && !val.includes('/') && !val.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                if (!val.toUpperCase().includes('FABRIC') && !val.toUpperCase().includes('TAPE') && !val.toUpperCase().includes('YARN')) {
+                  gdNumber = val;
+                  continue;
+                }
+              }
+
+              if (!gdDateVal && (val.match(/^\d{2}[-/]\d{2}[-/]\d{4}$/) || val.match(/^\d{4}[-/]\d{2}[-/]\d{2}$/))) {
+                gdDateVal = val;
+                continue;
+              }
             }
 
-            if (particulars && particulars !== 'PARTICULARS' && particulars !== 'GD NO. & DATE') {
-              let extractedDate = '';
-              const parts = currentGdNumber.split('-');
-              if (parts.length >= 3) {
-                const day = parts[parts.length - 3];
-                const month = parts[parts.length - 2];
-                const year = parts[parts.length - 1];
-                if (year && year.length === 4) {
-                  extractedDate = `${year}-${month}-${day}`;
+            if (!gdNumber && row[0]) gdNumber = String(row[0]).trim();
+            if (!gdDateVal && row[1]) gdDateVal = String(row[1]).trim();
+            particulars = String(row[2] || row[1] || '').trim();
+            hsCode = String(row[3] || row[2] || '').trim();
+            qty = Number(row[4] || row[3] || 0);
+            uom = String(row[5] || row[4] || 'KG').trim();
+            value = Number(row[6] || row[5] || row[4] || 0);
+
+            if (particulars === gdNumber || particulars === gdDateVal) {
+              particulars = String(row[3] || row[2] || '').trim();
+              hsCode = String(row[4] || row[3] || '').trim();
+              qty = Number(row[5] || row[4] || 0);
+              uom = String(row[6] || row[5] || 'KG').trim();
+              value = Number(row[7] || row[6] || 0);
+            }
+
+            if (particulars && particulars !== 'PARTICULARS' && particulars !== 'GD NO.' && particulars !== 'DATE') {
+              let formattedDate = new Date().toISOString();
+              if (gdDateVal) {
+                const dateParts = gdDateVal.split(/[-/]/);
+                if (dateParts.length === 3) {
+                  if (dateParts[0].length === 4) {
+                    formattedDate = `${dateParts[0]}-${dateParts[1]}-${dateParts[2]}`;
+                  } else {
+                    formattedDate = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
+                  }
                 }
               }
 
               parsedItems.push({
-                gdNumber: currentGdNumber || 'GD-IMP-UNKNOWN',
-                gdDate: extractedDate || new Date().toISOString(),
+                gdNumber: gdNumber || 'GD-IMP-001',
+                gdDate: formattedDate,
                 itemDescription: particulars,
                 hsCode: hsCode || '5402.3300',
                 quantity: isNaN(qty) ? 0 : qty,
@@ -154,7 +172,7 @@ export default function ImportGdForm() {
         }
 
         setItems(parsedItems);
-        setMessage(`Successfully extracted Importer and ${parsedItems.length} unique import items matrix with GD numbers!`);
+        setMessage(`Successfully extracted Importer and ${parsedItems.length} unique import items with correct columns mapping!`);
       } catch (err: any) {
         setMessage('Error parsing Excel: ' + err.message);
       }
@@ -251,7 +269,7 @@ export default function ImportGdForm() {
 
     const matchedParty = parties.find(
       p => p.companyName.toLowerCase().includes(extractedPartyName.toLowerCase()) || 
-           extractedPartyName.toLowerCase().includes(p.companyName.toLowerCase())
+            extractedPartyName.toLowerCase().includes(p.companyName.toLowerCase())
     );
     const partyId = matchedParty ? matchedParty.id : (parties.length > 0 ? parties[0].id : null);
 
@@ -330,24 +348,6 @@ export default function ImportGdForm() {
     }
   };
 
-  const handleDeletePartyAll = async (partyName: string) => {
-    if (!confirm(`WARNING: Are you sure you want to delete ALL import records and items for party "${partyName}"? This action cannot be undone.`)) return;
-
-    try {
-      const partyRecords = savedImports.filter(rec => rec.party?.companyName?.toLowerCase() === partyName.toLowerCase());
-      for (const rec of partyRecords) {
-        if (rec.id) {
-          await fetch(`/api/v1/imports?id=${encodeURIComponent(rec.id)}`, { method: 'DELETE' });
-        }
-      }
-      alert(`All import records for ${partyName} deleted successfully!`);
-      fetchData();
-    } catch (err: any) {
-      alert('Bulk delete failed: ' + err.message);
-    }
-  };
-
-  // Dedicated Clean Print Function (Opens a clean print window without dashboard elements)
   const triggerPrint = (title: string, subTitle: string, dataItems: any[]) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -378,6 +378,7 @@ export default function ImportGdForm() {
               <tr>
                 <th>Sr #</th>
                 <th>Import GD Number</th>
+                <th>GD Date</th>
                 <th>Particulars</th>
                 <th>HS Code</th>
                 <th class="text-right">Quantity</th>
@@ -390,6 +391,7 @@ export default function ImportGdForm() {
                 <tr>
                   <td>${i + 1}</td>
                   <td>${item.gdNumber || ''}</td>
+                  <td>${item.gdDate ? new Date(item.gdDate).toLocaleDateString() : ''}</td>
                   <td>${item.itemDescription || ''}</td>
                   <td>${item.hsCode || ''}</td>
                   <td class="text-right">${formatNumber(item.quantity, 0)}</td>
@@ -422,109 +424,148 @@ export default function ImportGdForm() {
     );
   };
 
-  const handlePrintPartyAllItems = () => {
-    if (!partyPrintModal) return;
-    triggerPrint(
-      'Party Complete Import Items Summary',
-      `Importer Party: ${partyPrintModal.partyName} (Total Items: ${partyPrintModal.allItems.length})`,
-      partyPrintModal.allItems
-    );
-  };
+  const filteredImports = savedImports.filter((rec) => {
+    const gdMatch = rec.gdNumber?.toLowerCase().includes(historySearch.toLowerCase());
+    const partyMatchText = rec.party?.companyName?.toLowerCase().includes(historySearch.toLowerCase());
+    const searchCondition = !historySearch || gdMatch || partyMatchText;
 
-  const handlePrintPartyAll = (partyName: string) => {
-    const partyRecords = savedImports.filter(rec => rec.party?.companyName?.toLowerCase() === partyName.toLowerCase());
-    const allPartyItems: any[] = [];
-    partyRecords.forEach(rec => {
+    const partyIdMatch = !filterPartyId || rec.partyId === filterPartyId || rec.party?.id === filterPartyId;
+
+    let dateMatch = true;
+    if (rec.gdDate) {
+      const recDate = new Date(rec.gdDate).toISOString().split('T')[0];
+      if (filterFromDate && recDate < filterFromDate) dateMatch = false;
+      if (filterToDate && recDate > filterToDate) dateMatch = false;
+    } else if (filterFromDate || filterToDate) {
+      dateMatch = false;
+    }
+
+    return searchCondition && partyIdMatch && dateMatch;
+  });
+
+  const handlePrintFilteredReport = () => {
+    const allFilteredItems: any[] = [];
+    filteredImports.forEach(rec => {
       if (rec.items) {
         rec.items.forEach((it: any) => {
-          allPartyItems.push({
+          allFilteredItems.push({
             ...it,
-            gdNumber: it.gdNumber || rec.gdNumber
+            gdNumber: it.gdNumber || rec.gdNumber,
+            gdDate: rec.gdDate
           });
         });
       }
     });
-    setPartyPrintModal({ partyName, allItems: allPartyItems });
+
+    const selectedPartyObj = parties.find(p => p.id === filterPartyId);
+    const partyLabel = selectedPartyObj ? selectedPartyObj.companyName : (filterPartyId ? 'Selected Party' : 'All Parties');
+    const dateRangeLabel = `Date Range: ${filterFromDate || 'Start'} to ${filterToDate || 'End'}`;
+
+    triggerPrint(
+      'Customs Import Clearance Filtered Report',
+      `Party: ${partyLabel} | ${dateRangeLabel} | Total Records: ${filteredImports.length} GDs`,
+      allFilteredItems
+    );
   };
 
-  const filteredImports = savedImports.filter((rec) => {
-    const gdMatch = rec.gdNumber?.toLowerCase().includes(historySearch.toLowerCase());
-    const partyMatch = rec.party?.companyName?.toLowerCase().includes(historySearch.toLowerCase());
-    return gdMatch || partyMatch;
-  });
-
-  const uniqueParties = Array.from(new Set(savedImports.map(r => r.party?.companyName).filter(Boolean)));
-
   return (
-    <div className="space-y-6 sm:space-y-8 max-w-6xl mx-auto p-4 sm:p-6 text-slate-100">
-      {/* Mode Switcher Tabs */}
-      <div className="flex items-center justify-end gap-2">
-        <button
-          type="button"
-          onClick={() => setActiveTab('auto')}
-          className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${activeTab === 'auto' ? 'bg-emerald-600 text-white shadow-lg' : 'bg-slate-800 text-slate-400 hover:text-white'}`}
-        >
-          <FileSpreadsheet className="w-4 h-4" /> Auto Excel Import
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('manual')}
-          className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${activeTab === 'manual' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-800 text-slate-400 hover:text-white'}`}
-        >
-          <Edit3 className="w-4 h-4" /> Manual Entry Form
-        </button>
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col justify-between p-3 sm:p-6 space-y-6 sm:space-y-8 max-w-[1700px] mx-auto overflow-x-hidden">
+      <style jsx global>{`
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+      `}</style>
+
+      {/* Top Banner Header */}
+      <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl shadow-xl overflow-hidden">
+        <div className="bg-gradient-to-r from-blue-700 via-blue-900 to-slate-950 p-5 sm:p-8 text-white flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 sm:gap-6">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-blue-100 text-xs sm:text-sm font-black uppercase tracking-wider">
+              <ArrowDownLeft className="w-4 h-4 text-cyan-400" /> WebOC Gateway &bull; Import Clearance Management
+            </div>
+            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-tight">Import Clearance (GD)</h1>
+            <p className="text-sm sm:text-base text-blue-200 font-medium max-w-2xl">
+              Upload Excel sheets for auto-extraction with separate GD No & Date columns or use manual entry forms.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 flex-wrap w-full lg:w-auto">
+            <button
+              type="button"
+              onClick={() => setActiveTab('auto')}
+              className={`flex-1 sm:flex-none px-4 sm:px-5 py-3 rounded-xl text-xs sm:text-sm font-black uppercase tracking-wider transition flex items-center justify-center gap-2 shadow cursor-pointer ${activeTab === 'auto' ? 'bg-blue-600 text-white shadow-blue-600/30' : 'bg-blue-900/80 text-blue-200 hover:bg-blue-800 border border-blue-600/40'}`}
+            >
+              <FileSpreadsheet className="w-4 h-4" /> Auto Excel Import
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('manual')}
+              className={`flex-1 sm:flex-none px-4 sm:px-5 py-3 rounded-xl text-xs sm:text-sm font-black uppercase tracking-wider transition flex items-center justify-center gap-2 shadow cursor-pointer ${activeTab === 'manual' ? 'bg-blue-600 text-white shadow-blue-600/30' : 'bg-blue-900/80 text-blue-200 hover:bg-blue-800 border border-blue-600/40'}`}
+            >
+              <Edit3 className="w-4 h-4" /> Manual Entry Form
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* --- TAB 1: AUTO EXCEL UPLOAD BOX --- */}
       {activeTab === 'auto' && (
-        <div className="p-5 sm:p-8 bg-slate-900 rounded-2xl shadow-2xl border border-slate-800 text-slate-100 animate-fadeIn space-y-6">
-          <h2 className="text-xl sm:text-2xl font-bold text-white border-b border-slate-800 pb-4 flex items-center gap-2">
-            <FileSpreadsheet className="w-6 h-6 text-emerald-400" /> Import GD Module - Auto Excel Import
-          </h2>
+        <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+            <h2 className="text-xl sm:text-2xl font-black text-slate-900 flex items-center gap-2.5">
+              <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl border border-blue-200">
+                <FileSpreadsheet className="w-5 h-5" />
+              </div>
+              Auto Excel Import GD Parser
+            </h2>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="bg-slate-800/60 p-5 sm:p-6 rounded-xl border-2 border-dashed border-slate-700 hover:border-emerald-500 transition">
-              <label className="block text-sm font-semibold text-slate-300 mb-2">Upload Import Template Excel File</label>
+            <div className="bg-slate-50 p-4 sm:p-6 rounded-2xl border-2 border-dashed border-slate-400 hover:border-blue-600 transition">
+              <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700 mb-3">Upload Import Template Excel File (.xlsx, .xls)</label>
               <input
                 type="file"
                 accept=".xlsx, .xls"
                 onChange={handleFileUpload}
-                className="w-full text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 cursor-pointer text-xs"
+                className="w-full text-slate-700 file:mr-4 file:py-3 file:px-6 file:rounded-xl file:border-0 file:text-xs file:font-black file:uppercase file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer text-sm font-semibold"
               />
-              {message && <p className="text-xs text-green-400 mt-3 font-medium bg-green-950/50 p-2.5 rounded border border-green-800">{message}</p>}
+              {message && <p className="text-xs sm:text-sm text-blue-700 mt-4 font-bold bg-blue-50 p-3.5 rounded-xl border border-blue-200">{message}</p>}
             </div>
 
             {extractedPartyName && (
-              <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 sm:p-5 space-y-2 text-slate-200 shadow-sm text-xs sm:text-sm">
-                <div><span className="font-bold text-white">Auto-Detected Importer:</span> {extractedPartyName}</div>
-                <div><span className="font-bold text-white">Total Import Items Extracted:</span> {items.length} rows</div>
+              <div className="bg-blue-50 border border-blue-300 rounded-2xl p-4 sm:p-5 space-y-1.5 text-slate-800 shadow-sm text-sm sm:text-base">
+                <div><span className="font-black text-slate-900">Auto-Detected Importer:</span> {extractedPartyName}</div>
+                <div><span className="font-black text-slate-900">Total Import Items Extracted:</span> {items.length} rows</div>
               </div>
             )}
 
             {items.length > 0 && (
-              <div>
-                <h3 className="text-lg font-bold text-white mb-3">Extracted Import Matrix Preview</h3>
-                <div className="overflow-x-auto border border-slate-700 rounded-xl shadow-sm bg-slate-800">
-                  <table className="min-w-full divide-y divide-slate-700 text-xs sm:text-sm">
-                    <thead className="bg-slate-900 text-slate-300 font-semibold">
+              <div className="space-y-3">
+                <h3 className="text-base sm:text-lg font-black text-slate-900">Extracted Import Matrix Preview</h3>
+                <div className="overflow-x-auto border-2 border-slate-300 rounded-2xl shadow-sm bg-white">
+                  <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
+                    <thead className="bg-slate-900 text-white font-black uppercase text-[11px] sm:text-xs tracking-wider">
                       <tr>
-                        <th className="px-3 sm:px-4 py-3 text-left">GD Number &amp; Date</th>
-                        <th className="px-3 sm:px-4 py-3 text-left">Particulars</th>
-                        <th className="px-3 sm:px-4 py-3 text-left">HS Code</th>
-                        <th className="px-3 sm:px-4 py-3 text-right">Quantity</th>
-                        <th className="px-3 sm:px-4 py-3 text-left">UOM</th>
-                        <th className="px-3 sm:px-4 py-3 text-right">Value</th>
+                        <th className="px-4 py-3.5 text-left">GD Number</th>
+                        <th className="px-4 py-3.5 text-left">GD Date</th>
+                        <th className="px-4 py-3.5 text-left">Particulars</th>
+                        <th className="px-4 py-3.5 text-left">HS Code</th>
+                        <th className="px-4 py-3.5 text-right">Quantity</th>
+                        <th className="px-4 py-3.5 text-left">UOM</th>
+                        <th className="px-4 py-3.5 text-right">Value</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-700 text-slate-200">
+                    <tbody className="divide-y divide-slate-200 text-slate-800 font-medium">
                       {items.map((item, index) => (
-                        <tr key={index} className="hover:bg-slate-750 transition">
-                          <td className="px-3 sm:px-4 py-3 font-mono text-xs font-semibold text-emerald-400">{item.gdNumber}</td>
-                          <td className="px-3 sm:px-4 py-3 font-medium text-white">{item.itemDescription}</td>
-                          <td className="px-3 sm:px-4 py-3 text-slate-300">{item.hsCode}</td>
-                          <td className="px-3 sm:px-4 py-3 text-right font-mono text-slate-200">{formatNumber(item.quantity, 0)}</td>
-                          <td className="px-3 sm:px-4 py-3 font-semibold text-slate-300">{item.uom || 'KG'}</td>
-                          <td className="px-3 sm:px-4 py-3 text-right font-mono text-slate-200">{formatNumber(item.importValueVal, 2)}</td>
+                        <tr key={index} className="hover:bg-slate-50 transition">
+                          <td className="px-4 py-3.5 font-mono text-xs sm:text-sm font-black text-blue-700">{item.gdNumber}</td>
+                          <td className="px-4 py-3.5 font-mono text-xs sm:text-sm font-black text-slate-900">{item.gdDate ? new Date(item.gdDate).toLocaleDateString() : ''}</td>
+                          <td className="px-4 py-3.5 font-black text-slate-900 text-xs sm:text-sm">{item.itemDescription}</td>
+                          <td className="px-4 py-3.5 text-slate-900 font-mono font-black text-xs sm:text-sm">{item.hsCode}</td>
+                          <td className="px-4 py-3.5 text-right font-mono font-black text-slate-900 text-xs sm:text-sm">{formatNumber(item.quantity, 0)}</td>
+                          <td className="px-4 py-3.5 font-black text-slate-900 text-xs sm:text-sm">{item.uom || 'KG'}</td>
+                          <td className="px-4 py-3.5 text-right font-mono font-black text-slate-900 text-xs sm:text-sm">{formatNumber(item.importValueVal, 2)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -536,7 +577,7 @@ export default function ImportGdForm() {
             <button
               type="submit"
               disabled={loading || items.length === 0}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl transition duration-200 shadow-lg disabled:opacity-50 text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black text-xs sm:text-sm uppercase tracking-wider py-3.5 sm:py-4 rounded-2xl transition shadow-xl shadow-blue-600/25 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
               {loading ? 'Saving to Database...' : 'Save Import GD Automatically'}
@@ -547,37 +588,40 @@ export default function ImportGdForm() {
 
       {/* --- TAB 2: MANUAL ENTRY FORM BOX --- */}
       {activeTab === 'manual' && (
-        <form onSubmit={handleSaveManualImport} className="p-5 sm:p-8 bg-slate-900 rounded-2xl shadow-2xl border border-slate-800 text-slate-100 space-y-6 animate-fadeIn">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
-            <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
-              <Edit3 className="w-6 h-6 text-blue-400" /> Manual Import GD &amp; Items Entry
+        <form onSubmit={handleSaveManualImport} className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+            <h2 className="text-xl sm:text-2xl font-black text-slate-900 flex items-center gap-2.5">
+              <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl border border-blue-200">
+                <Edit3 className="w-5 h-5" />
+              </div>
+              Manual Import GD &amp; Items Entry Form
             </h2>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
               <button
                 type="button"
                 onClick={handleAddManualItemRow}
-                className="flex-1 sm:flex-none px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 shadow cursor-pointer"
+                className="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider rounded-xl transition flex items-center justify-center gap-1.5 shadow cursor-pointer"
               >
                 <Plus className="w-4 h-4" /> Add Item Row
               </button>
               <button
                 type="button"
                 onClick={handleCancelManual}
-                className="flex-1 sm:flex-none px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 shadow cursor-pointer border border-slate-700"
+                className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider rounded-xl transition flex items-center justify-center gap-1.5 shadow cursor-pointer border border-slate-300"
               >
                 <X className="w-4 h-4" /> Cancel
               </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-300 uppercase">Select Client Party *</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <div className="space-y-2">
+              <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700">Select Client Party *</label>
               <select
                 value={selectedManualPartyId}
                 onChange={(e) => setSelectedManualPartyId(e.target.value)}
                 required
-                className="w-full p-3 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500 font-medium"
+                className="w-full p-3.5 bg-slate-50 border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-600 cursor-pointer shadow-sm"
               >
                 <option value="">-- Choose Party --</option>
                 {parties.map(party => (
@@ -588,83 +632,84 @@ export default function ImportGdForm() {
               </select>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-300 uppercase">Import GD Number *</label>
+            <div className="space-y-2">
+              <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700">Import GD Number *</label>
               <input
                 type="text"
-                placeholder="e.g. KAPS-FS-202123-30-05-2026"
+                placeholder="e.g. KAPS-FS-202123"
                 value={manualGdNumber}
                 onChange={(e) => setManualGdNumber(e.target.value)}
                 required
-                className="w-full p-3 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
+                className="w-full p-3.5 bg-slate-50 border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 font-mono shadow-sm"
               />
             </div>
 
-            <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
-              <label className="block text-xs font-bold text-slate-300 uppercase">GD Date</label>
+            <div className="space-y-2 sm:col-span-2 lg:col-span-1">
+              <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700">GD Date *</label>
               <input
                 type="date"
                 value={manualGdDate}
                 onChange={(e) => setManualGdDate(e.target.value)}
-                className="w-full p-3 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500"
+                required
+                className="w-full p-3.5 bg-slate-50 border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-600 font-mono shadow-sm"
               />
             </div>
           </div>
 
-          <div className="space-y-4 pt-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">GD Line Items</h3>
+          <div className="space-y-4 pt-4 border-t border-slate-200">
+            <h3 className="text-xs sm:text-sm font-black uppercase tracking-widest text-slate-500">GD Line Items Matrix</h3>
             {manualItems.map((item, idx) => (
-              <div key={idx} className="bg-slate-950 border border-slate-800 p-4 rounded-xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
-                <div className="sm:col-span-2 lg:col-span-4 space-y-1">
-                  <label className="block text-[10px] text-slate-400 uppercase font-semibold">Description *</label>
+              <div key={idx} className="bg-slate-50 border-2 border-slate-300 p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end shadow-sm">
+                <div className="sm:col-span-2 lg:col-span-4 space-y-1.5">
+                  <label className="block text-[11px] text-slate-600 uppercase font-black">Description *</label>
                   <input
                     type="text"
                     placeholder="Item description..."
                     value={item.description}
                     onChange={(e) => handleManualItemChange(idx, 'description', e.target.value)}
                     required
-                    className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500"
+                    className="w-full p-3 bg-white border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-600"
                   />
                 </div>
-                <div className="sm:col-span-1 lg:col-span-2 space-y-1">
-                  <label className="block text-[10px] text-slate-400 uppercase font-semibold">HS Code (PCT)</label>
+                <div className="sm:col-span-1 lg:col-span-2 space-y-1.5">
+                  <label className="block text-[11px] text-slate-600 uppercase font-black">HS Code (PCT)</label>
                   <input
                     type="text"
                     placeholder="e.g. 5407.9400"
                     value={item.hsCode}
                     onChange={(e) => handleManualItemChange(idx, 'hsCode', e.target.value)}
-                    className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white font-mono focus:outline-none focus:border-blue-500"
+                    className="w-full p-3 bg-white border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 font-mono focus:outline-none focus:border-blue-600"
                   />
                 </div>
-                <div className="sm:col-span-1 lg:col-span-2 space-y-1">
-                  <label className="block text-[10px] text-slate-400 uppercase font-semibold">Quantity *</label>
+                <div className="sm:col-span-1 lg:col-span-2 space-y-1.5">
+                  <label className="block text-[11px] text-slate-600 uppercase font-black">Quantity *</label>
                   <input
                     type="number"
                     placeholder="0"
                     value={item.quantity}
                     onChange={(e) => handleManualItemChange(idx, 'quantity', e.target.value)}
                     required
-                    className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white font-mono focus:outline-none focus:border-blue-500"
+                    className="w-full p-3 bg-white border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-black text-slate-900 font-mono focus:outline-none focus:border-blue-600"
                   />
                 </div>
-                <div className="sm:col-span-1 lg:col-span-1 space-y-1">
-                  <label className="block text-[10px] text-slate-400 uppercase font-semibold">UOM</label>
+                <div className="sm:col-span-1 lg:col-span-1 space-y-1.5">
+                  <label className="block text-[11px] text-slate-600 uppercase font-black">UOM</label>
                   <input
                     type="text"
                     value={item.uom}
                     onChange={(e) => handleManualItemChange(idx, 'uom', e.target.value)}
-                    className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white font-mono focus:outline-none focus:border-blue-500 text-center"
+                    className="w-full p-3 bg-white border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-black text-slate-900 font-mono focus:outline-none focus:border-blue-600 text-center"
                   />
                 </div>
-                <div className="sm:col-span-1 lg:col-span-2 space-y-1">
-                  <label className="block text-[10px] text-slate-400 uppercase font-semibold">Assessable Value *</label>
+                <div className="sm:col-span-1 lg:col-span-2 space-y-1.5">
+                  <label className="block text-[11px] text-slate-600 uppercase font-black">Assessable Value *</label>
                   <input
                     type="number"
                     placeholder="0.00"
                     value={item.assessableValue}
                     onChange={(e) => handleManualItemChange(idx, 'assessableValue', e.target.value)}
                     required
-                    className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white font-mono focus:outline-none focus:border-blue-500"
+                    className="w-full p-3 bg-white border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-black text-slate-900 font-mono focus:outline-none focus:border-blue-600"
                   />
                 </div>
                 <div className="sm:col-span-2 lg:col-span-1 text-right sm:text-center">
@@ -672,21 +717,21 @@ export default function ImportGdForm() {
                     type="button"
                     onClick={() => handleRemoveManualItemRow(idx)}
                     disabled={manualItems.length === 1}
-                    className="w-full sm:w-auto p-2.5 bg-red-950/60 hover:bg-red-900 text-red-300 rounded-lg border border-red-700/50 transition disabled:opacity-40 cursor-pointer flex items-center justify-center gap-2"
+                    className="w-full sm:w-auto p-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl border border-red-300 transition disabled:opacity-40 cursor-pointer flex items-center justify-center gap-2"
                     title="Remove Item"
                   >
-                    <Trash2 className="w-4 h-4" /> <span className="sm:hidden text-xs">Remove Row</span>
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+          <div className="flex flex-col sm:flex-row items-center gap-3 pt-4 border-t border-slate-200">
             <button
               type="submit"
               disabled={isSavingManual}
-              className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition duration-200 shadow-lg text-xs sm:text-base flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs sm:text-sm uppercase tracking-wider py-3.5 sm:py-4 rounded-2xl transition shadow-xl shadow-blue-600/25 flex items-center justify-center gap-2 cursor-pointer"
             >
               {isSavingManual ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
               {isSavingManual ? 'Saving Manual GD...' : 'Save Manual Import GD'}
@@ -694,7 +739,7 @@ export default function ImportGdForm() {
             <button
               type="button"
               onClick={handleCancelManual}
-              className="w-full sm:w-auto px-6 py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl transition border border-slate-700 cursor-pointer text-xs sm:text-base"
+              className="w-full sm:w-auto px-8 py-3.5 sm:py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm uppercase tracking-wider rounded-2xl transition border border-slate-300 cursor-pointer"
             >
               Cancel
             </button>
@@ -703,181 +748,175 @@ export default function ImportGdForm() {
       )}
 
       {/* Saved Imports History Section */}
-      <div className="p-5 sm:p-8 bg-slate-900 rounded-2xl shadow-2xl border border-slate-800 text-slate-100 space-y-6">
-        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+      <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6">
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-slate-200 pb-5">
           <div>
-            <h3 className="text-lg sm:text-xl font-bold text-white">Saved Imports History (Database Records)</h3>
-            <p className="text-xs text-slate-400 mt-0.5">Total {savedImports.length} Import GDs saved in system</p>
+            <h3 className="text-xl sm:text-2xl font-black text-slate-900">Saved Imports History (Database Records)</h3>
+            <p className="text-xs sm:text-sm text-slate-500 font-bold mt-0.5">Total {savedImports.length} Import GDs saved in system</p>
           </div>
-          
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-            {uniqueParties.map((partyName: string, pIdx: number) => (
-              <div key={pIdx} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                <button
-                  onClick={() => handlePrintPartyAll(partyName)}
-                  className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-3.5 py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shadow cursor-pointer"
-                >
-                  🖨️ Print {partyName} All
-                </button>
-                <button
-                  onClick={() => handleDeletePartyAll(partyName)}
-                  className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3.5 py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shadow cursor-pointer"
-                  title={`Delete all import records for ${partyName}`}
-                >
-                  🗑️ Delete All {partyName} Items
-                </button>
-              </div>
-            ))}
+        </div>
 
+        {/* Filter Controls Bar */}
+        <div className="bg-slate-50 border-2 border-slate-300 p-4 sm:p-5 rounded-2xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 items-end shadow-sm">
+          <div className="lg:col-span-4 space-y-1.5">
+            <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700">Filter by Party</label>
+            <select
+              value={filterPartyId}
+              onChange={(e) => setFilterPartyId(e.target.value)}
+              className="w-full p-3 bg-white border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-600 cursor-pointer shadow-sm"
+            >
+              <option value="">-- All Parties --</option>
+              {parties.map(p => (
+                <option key={p.id} value={p.id}>{p.companyName}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="lg:col-span-3 space-y-1.5">
+            <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700">From Date</label>
             <input
-              type="text"
-              placeholder="🔍 Search Import GD # or Party..."
-              value={historySearch}
-              onChange={(e) => setHistorySearch(e.target.value)}
-              className="w-full sm:w-64 px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs sm:text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-medium"
+              type="date"
+              value={filterFromDate}
+              onChange={(e) => setFilterFromDate(e.target.value)}
+              className="w-full p-3 bg-white border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 font-mono focus:outline-none focus:border-blue-600 shadow-sm"
             />
+          </div>
+
+          <div className="lg:col-span-3 space-y-1.5">
+            <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700">To Date</label>
+            <input
+              type="date"
+              value={filterToDate}
+              onChange={(e) => setFilterToDate(e.target.value)}
+              className="w-full p-3 bg-white border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 font-mono focus:outline-none focus:border-blue-600 shadow-sm"
+            />
+          </div>
+
+          <div className="lg:col-span-2 flex items-center gap-2">
+            <button
+              onClick={handlePrintFilteredReport}
+              disabled={filteredImports.length === 0}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-black uppercase tracking-wider py-3 px-3 rounded-xl transition flex items-center justify-center gap-1.5 shadow cursor-pointer disabled:opacity-50"
+              title="Print Filtered Results"
+            >
+              <Printer className="w-4 h-4" /> Print
+            </button>
+            <button
+              onClick={() => { setFilterPartyId(''); setFilterFromDate(''); setFilterToDate(''); setHistorySearch(''); }}
+              className="px-4 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs sm:text-sm font-black uppercase tracking-wider rounded-xl transition cursor-pointer border border-slate-300 shadow-sm"
+              title="Reset Filters"
+            >
+              Reset
+            </button>
           </div>
         </div>
 
         {filteredImports.length === 0 ? (
-          <p className="text-slate-400 text-xs sm:text-sm py-8 text-center bg-slate-950 rounded-xl border border-slate-800">
-            {savedImports.length === 0 ? 'No import records found in database yet.' : 'No matching import GD found for your search.'}
+          <p className="text-slate-500 text-sm py-12 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-300 font-bold">
+            {savedImports.length === 0 ? 'No import records found in database yet.' : 'No matching import GD found for selected party or date range.'}
           </p>
         ) : (
-          <>
-            {/* MOBILE CARDS VIEW (Hidden on Desktop) */}
-            <div className="block sm:hidden space-y-4">
-              {filteredImports.map((rec, idx) => (
-                <div key={idx} className="bg-slate-950 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase">Importer (Party)</span>
-                      <h4 className="text-sm font-black text-white">{rec.party?.companyName || 'N/A'}</h4>
-                    </div>
-                    <span className="bg-slate-800 text-slate-200 px-2.5 py-1 rounded-lg text-xs font-semibold shrink-0">
-                      {rec.items?.length || 0} items
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">Import GD Number</span>
-                    <p className="text-xs font-mono font-bold text-emerald-400 break-all">{rec.gdNumber}</p>
-                  </div>
-
-                  <div className="pt-2 border-t border-slate-800/80 flex items-center gap-2">
-                    <button
-                      onClick={() => setSelectedGdItems({ items: rec.items, gdNumber: rec.gdNumber, partyName: rec.party?.companyName })}
-                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2 rounded-xl transition text-center cursor-pointer shadow"
-                    >
-                      View Items
-                    </button>
-                    <button
-                      onClick={() => handleDelete(rec.id, rec.gdNumber)}
-                      className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold py-2 rounded-xl transition text-center cursor-pointer shadow"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* DESKTOP TABLE VIEW (Hidden on Mobile) */}
-            <div className="hidden sm:block overflow-x-auto border border-slate-700 rounded-xl shadow-sm bg-slate-800">
-              <table className="min-w-full divide-y divide-slate-700 text-xs sm:text-sm">
-                <thead className="bg-slate-900 text-slate-300 font-semibold">
-                  <tr>
-                    <th className="px-3 sm:px-4 py-3 text-left">Importer (Party)</th>
-                    <th className="px-3 sm:px-4 py-3 text-left">Import GD Number</th>
-                    <th className="px-3 sm:px-4 py-3 text-left">Items Count</th>
-                    <th className="px-3 sm:px-4 py-3 text-center">Actions</th>
+          <div className="overflow-x-auto border-2 border-slate-300 rounded-2xl shadow-sm bg-white">
+            <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
+              <thead className="bg-slate-900 text-white font-black uppercase text-[11px] sm:text-xs tracking-wider">
+                <tr>
+                  <th className="px-4 py-3.5 text-left">Importer (Party)</th>
+                  <th className="px-4 py-3.5 text-left">Import GD Number</th>
+                  <th className="px-4 py-3.5 text-left">GD Date</th>
+                  <th className="px-4 py-3.5 text-left">Items Count</th>
+                  <th className="px-4 py-3.5 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 text-slate-900 font-medium">
+                {filteredImports.map((rec, idx) => (
+                  <tr key={idx} className="hover:bg-slate-50 transition">
+                    <td className="px-4 py-3.5 text-xs sm:text-sm font-black text-slate-900">{rec.party?.companyName || 'N/A'}</td>
+                    <td className="px-4 py-3.5 font-mono text-xs sm:text-sm font-black text-blue-700">{rec.gdNumber}</td>
+                    <td className="px-4 py-3.5 font-mono text-xs sm:text-sm font-black text-slate-900">{rec.gdDate ? new Date(rec.gdDate).toLocaleDateString() : ''}</td>
+                    <td className="px-4 py-3.5">
+                      <span className="bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 rounded-lg text-xs sm:text-sm font-black font-mono">
+                        {rec.items?.length || 0} items
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 text-center space-x-2 whitespace-nowrap">
+                      <button
+                        onClick={() => setSelectedGdItems({ items: rec.items, gdNumber: rec.gdNumber, partyName: rec.party?.companyName })}
+                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase tracking-wider px-3.5 sm:px-4 py-2 rounded-xl transition cursor-pointer shadow"
+                      >
+                        View Items
+                      </button>
+                      <button
+                        onClick={() => handleDelete(rec.id, rec.gdNumber)}
+                        className="bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-wider px-3.5 sm:px-4 py-2 rounded-xl transition cursor-pointer shadow"
+                      >
+                        Delete
+                      </button>
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-700 text-slate-200">
-                  {filteredImports.map((rec, idx) => (
-                    <tr key={idx} className="hover:bg-slate-750 transition">
-                      <td className="px-3 sm:px-4 py-3 font-semibold text-white">{rec.party?.companyName || 'N/A'}</td>
-                      <td className="px-3 sm:px-4 py-3 font-mono text-xs font-semibold text-emerald-400">{rec.gdNumber}</td>
-                      <td className="px-3 sm:px-4 py-3">
-                        <span className="bg-slate-700 text-slate-200 px-2.5 py-1 rounded-md text-xs font-semibold">
-                          {rec.items?.length || 0} items
-                        </span>
-                      </td>
-                      <td className="px-3 sm:px-4 py-3 text-center space-x-2">
-                        <button
-                          onClick={() => setSelectedGdItems({ items: rec.items, gdNumber: rec.gdNumber, partyName: rec.party?.companyName })}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition cursor-pointer"
-                        >
-                          View Items
-                        </button>
-                        <button
-                          onClick={() => handleDelete(rec.id, rec.gdNumber)}
-                          className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition cursor-pointer"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
-      {/* Modal Popup to View Single Import GD Items */}
+      {/* Footer */}
+      <footer className="bg-gradient-to-r from-blue-700 via-blue-900 to-slate-950 text-blue-200 text-center py-4 text-xs sm:text-sm font-bold border-t border-blue-900 w-full shadow-inner rounded-2xl">
+        &copy; 2026 Customs Clearing ERP &bull; Powered by EFS Advanced Compliance Engine. All rights reserved.
+      </footer>
+
+      {/* Modal Popup */}
       {selectedGdItems && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-5xl w-full p-4 sm:p-6 shadow-2xl text-slate-100 max-h-[85vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-4 mb-4">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4">
+          <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-3xl max-w-5xl w-full p-4 sm:p-8 shadow-2xl space-y-6 max-h-[85vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-slate-200 pb-4">
               <div>
-                <h3 className="text-lg sm:text-xl font-bold text-white">Import GD Items Details</h3>
+                <h3 className="text-lg sm:text-xl font-black text-slate-900">Import GD Items Details</h3>
                 {selectedGdItems.partyName && (
-                  <p className="text-xs text-emerald-400 font-semibold mt-1">Party: {selectedGdItems.partyName}</p>
+                  <p className="text-xs sm:text-sm text-blue-700 font-black mt-1">Party: {selectedGdItems.partyName}</p>
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <button
                   onClick={handlePrintSingleGd}
-                  className="bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-4 py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase tracking-wider px-3.5 sm:px-4 py-2.5 rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow"
                 >
                   🖨️ Print Items
                 </button>
                 <button
                   onClick={() => setSelectedGdItems(null)}
-                  className="text-slate-400 hover:text-white font-bold text-lg bg-slate-800 px-3 py-1 rounded-lg cursor-pointer"
+                  className="text-slate-600 hover:text-slate-900 font-bold text-lg bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-xl cursor-pointer transition"
                 >
                   ✕
                 </button>
               </div>
             </div>
 
-            <div className="overflow-x-auto border border-slate-700 rounded-xl shadow-sm bg-slate-800">
-              <table className="min-w-full divide-y divide-slate-700 text-xs sm:text-sm">
-                <thead className="bg-slate-900 text-slate-300 font-semibold">
+            <div className="overflow-x-auto border-2 border-slate-300 rounded-2xl shadow-sm bg-white">
+              <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
+                <thead className="bg-slate-900 text-white font-black uppercase text-[11px] sm:text-xs tracking-wider">
                   <tr>
-                    <th className="px-3 sm:px-4 py-3 text-left">Sr #</th>
-                    <th className="px-3 sm:px-4 py-3 text-left">Import GD Number</th>
-                    <th className="px-3 sm:px-4 py-3 text-left">Particulars</th>
-                    <th className="px-3 sm:px-4 py-3 text-left">HS Code</th>
-                    <th className="px-3 sm:px-4 py-3 text-right">Quantity</th>
-                    <th className="px-3 sm:px-4 py-3 text-left">UOM</th>
-                    <th className="px-3 sm:px-4 py-3 text-right">Value</th>
+                    <th className="px-4 py-3.5 text-left">Sr #</th>
+                    <th className="px-4 py-3.5 text-left">Import GD Number</th>
+                    <th className="px-4 py-3.5 text-left">Particulars</th>
+                    <th className="px-4 py-3.5 text-left">HS Code</th>
+                    <th className="px-4 py-3.5 text-right">Quantity</th>
+                    <th className="px-4 py-3.5 text-left">UOM</th>
+                    <th className="px-4 py-3.5 text-right">Value</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-700 text-slate-200">
+                <tbody className="divide-y divide-slate-200 text-slate-900 font-medium">
                   {selectedGdItems.items.map((item: any, i: number) => (
-                    <tr key={i} className="hover:bg-slate-750 transition">
-                      <td className="px-3 sm:px-4 py-3 font-semibold text-slate-400">{item.serialNo || i + 1}</td>
-                      <td className="px-3 sm:px-4 py-3 font-mono text-xs font-semibold text-emerald-400">
+                    <tr key={i} className="hover:bg-slate-50 transition">
+                      <td className="px-4 py-3.5 font-bold text-slate-900">{item.serialNo || i + 1}</td>
+                      <td className="px-4 py-3.5 font-mono text-xs sm:text-sm font-black text-blue-700">
                         {item.gdNumber || selectedGdItems.gdNumber}
                       </td>
-                      <td className="px-3 sm:px-4 py-3 font-medium text-white">{item.itemDescription}</td>
-                      <td className="px-3 sm:px-4 py-3 text-slate-300">{item.hsCode}</td>
-                      <td className="px-3 sm:px-4 py-3 text-right font-mono text-slate-200">{formatNumber(item.quantity, 0)}</td>
-                      <td className="px-3 sm:px-4 py-3 font-semibold text-slate-300">{item.uom || item.unit || 'KG'}</td>
-                      <td className="px-3 sm:px-4 py-3 text-right font-mono text-slate-200">{formatNumber(item.importValueVal, 2)}</td>
+                      <td className="px-4 py-3.5 font-black text-slate-900 text-xs sm:text-sm">{item.itemDescription}</td>
+                      <td className="px-4 py-3.5 text-slate-900 font-mono font-black text-xs sm:text-sm">{item.hsCode}</td>
+                      <td className="px-4 py-3.5 text-right font-mono font-black text-slate-900 text-xs sm:text-sm">{formatNumber(item.quantity, 0)}</td>
+                      <td className="px-4 py-3.5 font-black text-slate-900 text-xs sm:text-sm">{item.uom || item.unit || 'KG'}</td>
+                      <td className="px-4 py-3.5 text-right font-mono font-black text-slate-900 text-xs sm:text-sm">{formatNumber(item.importValueVal, 2)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -887,75 +926,7 @@ export default function ImportGdForm() {
             <div className="mt-6 text-right">
               <button
                 onClick={() => setSelectedGdItems(null)}
-                className="bg-slate-700 hover:bg-slate-600 text-white font-semibold px-5 py-2.5 rounded-xl transition cursor-pointer text-xs sm:text-sm"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Popup to Print ALL Import Items of a Party across all GDs */}
-      {partyPrintModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-5xl w-full p-4 sm:p-6 shadow-2xl text-slate-100 max-h-[85vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-4 mb-4">
-              <div>
-                <h3 className="text-lg sm:text-xl font-bold text-white">Party Complete Import Items Summary</h3>
-                <p className="text-xs text-purple-400 font-semibold mt-1">Importer Party: {partyPrintModal.partyName} (Total Items: {partyPrintModal.allItems.length})</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handlePrintPartyAllItems}
-                  className="bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-4 py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer"
-                >
-                  🖨️ Print Party All Items
-                </button>
-                <button
-                  onClick={() => setPartyPrintModal(null)}
-                  className="text-slate-400 hover:text-white font-bold text-lg bg-slate-800 px-3 py-1 rounded-lg cursor-pointer"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto border border-slate-700 rounded-xl shadow-sm bg-slate-800">
-              <table className="min-w-full divide-y divide-slate-700 text-xs sm:text-sm">
-                <thead className="bg-slate-900 text-slate-300 font-semibold">
-                  <tr>
-                    <th className="px-3 sm:px-4 py-3 text-left">Sr #</th>
-                    <th className="px-3 sm:px-4 py-3 text-left">Import GD Number</th>
-                    <th className="px-3 sm:px-4 py-3 text-left">Particulars</th>
-                    <th className="px-3 sm:px-4 py-3 text-left">HS Code</th>
-                    <th className="px-3 sm:px-4 py-3 text-right">Quantity</th>
-                    <th className="px-3 sm:px-4 py-3 text-left">UOM</th>
-                    <th className="px-3 sm:px-4 py-3 text-right">Value</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-700 text-slate-200">
-                  {partyPrintModal.allItems.map((item: any, i: number) => (
-                    <tr key={i} className="hover:bg-slate-750 transition">
-                      <td className="px-3 sm:px-4 py-3 font-semibold text-slate-400">{i + 1}</td>
-                      <td className="px-3 sm:px-4 py-3 font-mono text-xs font-semibold text-emerald-400">
-                        {item.gdNumber}
-                      </td>
-                      <td className="px-3 sm:px-4 py-3 font-medium text-white">{item.itemDescription}</td>
-                      <td className="px-3 sm:px-4 py-3 text-slate-300">{item.hsCode}</td>
-                      <td className="px-3 sm:px-4 py-3 text-right font-mono text-slate-200">{formatNumber(item.quantity, 0)}</td>
-                      <td className="px-3 sm:px-4 py-3 font-semibold text-slate-300">{item.uom || item.unit || 'KG'}</td>
-                      <td className="px-3 sm:px-4 py-3 text-right font-mono text-slate-200">{formatNumber(item.importValueVal, 2)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="mt-6 text-right">
-              <button
-                onClick={() => setPartyPrintModal(null)}
-                className="bg-slate-700 hover:bg-slate-600 text-white font-semibold px-5 py-2.5 rounded-xl transition cursor-pointer text-xs sm:text-sm"
+                className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs sm:text-sm uppercase tracking-wider px-6 py-3 rounded-xl transition cursor-pointer"
               >
                 Close
               </button>

@@ -2,20 +2,27 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Lock, User, Loader2, CheckCircle2, ShieldCheck, FileText, CreditCard, Activity } from 'lucide-react';
-import Link from 'next/link';
+import { 
+  ShieldCheck, 
+  FileText, 
+  ArrowRight, 
+  Lock, 
+  Mail, 
+  Activity,
+  AlertCircle
+} from 'lucide-react';
 
-export default function WeBocLandingPage() {
+export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError(null);
+    setError('');
+    setIsLoading(true);
 
     try {
       const res = await fetch('/api/v1/auth/login', {
@@ -25,139 +32,163 @@ export default function WeBocLandingPage() {
       });
 
       const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Login failed');
-      }
 
-      // Successful login hone par dashboard par bhej dein
-      router.push('/dashboard');
-    } catch (err: any) {
-      setError(err.message);
+      if (res.ok && data.success) {
+        router.push('/dashboard');
+      } else {
+        setError(data.message || 'Invalid credentials. Please check your email or password.');
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('An unexpected error occurred. Please try again.');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col justify-between">
+    <div className="min-h-screen w-full flex flex-col lg:flex-row font-sans selection:bg-blue-600 selection:text-white bg-slate-950 overflow-x-hidden">
       
-      {/* --- TOP WEENOC STYLE HEADER WITH LOGIN BAR --- */}
-      <header className="bg-slate-900 border-b border-slate-800 shadow-md">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row items-center justify-between gap-4">
+      {/* Left Side: Modern Dark Gradient Showcase Area */}
+      <div className="lg:w-7/12 bg-gradient-to-br from-blue-950 via-slate-900 to-slate-950 p-8 lg:p-16 flex flex-col justify-between relative overflow-hidden border-r border-blue-950">
+        <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none"></div>
+
+        {/* Top Brand Logo */}
+        <div className="relative z-10 flex items-center gap-3">
+          <div className="w-12 h-12 bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 text-white rounded-2xl flex items-center justify-center font-black text-2xl shadow-xl shadow-blue-500/20">
+            CC
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-white tracking-wider uppercase flex items-center gap-2">
+              HASH <span className="text-xs font-mono bg-blue-600 text-white px-2 py-0.5 rounded shadow">ERP</span>
+            </h1>
+            <p className="text-xs font-medium text-blue-300">Digital Customs &amp; Freight Portal</p>
+          </div>
+        </div>
+
+        {/* Center Main Value Proposition */}
+        <div className="relative z-10 my-12 lg:my-0 space-y-6 max-w-2xl">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-bold tracking-wide uppercase">
+            <ShieldCheck className="w-4 h-4" /> WeBOC &amp; FBR-Ready Operations
+          </div>
           
-          {/* Logo Section */}
-          <div className="flex items-center gap-3">
-            <span className="text-2xl font-black tracking-wider text-white">
-              HASH <span className="text-xs font-mono uppercase bg-cyan-950 text-cyan-300 px-2 py-0.5 rounded border border-cyan-700/50">Customs ERP</span>
-            </span>
+          <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-none">
+            Digital customs clearing that keeps your logistics moving.
+          </h2>
+          
+          <p className="text-sm sm:text-base text-slate-300 leading-relaxed font-medium">
+            Manage importer/exporter parties, Goods Declarations (GD), IOCO input-output consumption matrices, analysis certificates, and automated audit reconciliations from one secure enterprise workspace.
+          </p>
+
+          {/* Feature Cards Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
+            <div className="p-5 bg-white/[0.04] backdrop-blur-xl border border-white/10 rounded-2xl space-y-2 hover:border-blue-500/50 transition">
+              <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold">
+                <FileText className="w-5 h-5" />
+              </div>
+              <h3 className="text-sm font-black text-white">Compliant Declarations</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Seamless structured Goods Declarations and Form-E audit ledgers.
+              </p>
+            </div>
+
+            <div className="p-5 bg-white/[0.04] backdrop-blur-xl border border-white/10 rounded-2xl space-y-2 hover:border-blue-500/50 transition">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+                <Activity className="w-5 h-5" />
+              </div>
+              <h3 className="text-sm font-black text-white">Clear Workflow</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Track live import/export clearances and real-time inventory balances.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer Note */}
+        <div className="relative z-10 pt-6 border-t border-white/10 text-xs text-slate-400 font-medium flex items-center justify-between">
+          <span>Secure access for authorized logistics teams only.</span>
+          <span className="text-emerald-400 font-mono font-bold flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> EFS Engine Online
+          </span>
+        </div>
+      </div>
+
+      {/* Right Side: Clean White Login Card Area with Larger, Bolder Fonts */}
+      <div className="lg:w-5/12 bg-slate-50 flex items-center justify-center p-6 sm:p-12 lg:p-16">
+        <div className="w-full max-w-md bg-white border-2 border-slate-200 rounded-3xl p-8 sm:p-10 shadow-2xl space-y-8 relative">
+          
+          <div className="space-y-2">
+            <h3 className="text-3xl font-black text-slate-900 tracking-tight">Welcome back</h3>
+            <p className="text-sm text-slate-600 font-semibold leading-relaxed">
+              Sign in with your authorized account to continue.
+            </p>
           </div>
 
-          {/* Top Login Form (WeBoc Style) */}
-          <div className="flex flex-col items-end">
-            <form onSubmit={handleLogin} className="flex items-center gap-2 flex-wrap">
-              {error && <span className="text-xs text-red-400 font-medium mr-2">{error}</span>}
-              
+          {error && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-3 text-red-700 text-xs font-semibold">
+              <AlertCircle className="w-5 h-5 shrink-0 text-red-600 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-6">
+            <div className="space-y-2.5">
+              <label className="text-xs font-black uppercase tracking-wider text-slate-800">Email address</label>
               <div className="relative">
-                <User className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                  <Mail className="w-5 h-5" />
+                </div>
                 <input
                   type="email"
-                  placeholder="Enter Email / User ID"
+                  required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="pl-9 pr-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-48"
+                  placeholder="name@company.com"
+                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-2 border-slate-200 focus:border-blue-600 focus:bg-white rounded-2xl text-base font-bold text-slate-900 outline-none transition placeholder:text-slate-400 placeholder:font-normal"
                 />
               </div>
+            </div>
 
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black uppercase tracking-wider text-slate-800">Password</label>
+              </div>
               <div className="relative">
-                <Lock className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                  <Lock className="w-5 h-5" />
+                </div>
                 <input
                   type="password"
-                  placeholder="Password"
+                  required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="pl-9 pr-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-36"
+                  placeholder="Enter your password"
+                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-2 border-slate-200 focus:border-blue-600 focus:bg-white rounded-2xl text-base font-bold text-slate-900 outline-none transition placeholder:text-slate-400 placeholder:font-normal"
                 />
               </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="px-5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded-lg transition shadow flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-              >
-                {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                Login
-              </button>
-            </form>
-            
-            {/* Register link added right below the login form */}
-            <div className="text-[11px] text-slate-400 mt-1 mr-1">
-              Don't have an account? <Link href="/register" className="text-cyan-400 font-bold hover:underline">Register Admin</Link>
-            </div>
-          </div>
-
-        </div>        
-      </header>
-
-      {/* --- HERO SECTION --- */}
-      <main className="max-w-6xl mx-auto px-4 py-12 flex-grow flex items-center">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
-          
-          <div className="lg:col-span-7 space-y-6">
-            <div className="inline-flex items-center gap-2 bg-cyan-950/60 border border-cyan-700/50 text-cyan-300 px-3 py-1 rounded-full text-xs font-bold">
-              <ShieldCheck className="w-4 h-4 text-cyan-400" /> Authorized Secure Portal
-            </div>
-            
-            <h1 className="text-4xl lg:text-5xl font-black text-white leading-tight">
-              Web Based <br /><span className="text-cyan-400">One Customs ERP</span>
-            </h1>
-            
-            <p className="text-slate-400 text-sm leading-relaxed">
-              Since inception, this platform has been playing a pivotal role in facilitating Traders, Custom Officers, and Clearing Agents. Streamline GD clearance, automated IOCO consumption, and inventory tracking seamlessly.
-            </p>
-
-            <div className="pt-2 flex flex-col gap-3">
-              <div className="flex items-center gap-3 text-xs text-slate-300 font-medium">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Paperless Declarations &amp; Import/Export Ledgers
-              </div>
-              <div className="flex items-center gap-3 text-xs text-slate-300 font-medium">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Autogenerated EFS Reconciliation
-              </div>
-            </div>
-          </div>
-
-          {/* Right Visual Card */}
-          <div className="lg:col-span-5 bg-slate-950 border border-slate-800 rounded-xl p-6 shadow-inner space-y-4">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-2">
-              <Activity className="w-4 h-4" /> System Quick Modules
-            </h3>
-            
-            <div className="space-y-2.5 text-xs">
-              <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 flex items-center justify-between">
-                <span className="font-semibold text-white">Import &amp; Export GDs</span>
-              </div>
-              <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 flex items-center justify-between">
-                <span className="font-semibold text-white">Analysis Certificates</span>
-              </div>
-              <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 flex items-center justify-between">
-                <span className="font-semibold text-white">IOCO Analysis &amp; Wastage</span>
-              </div>
             </div>
 
-            <p className="text-[11px] text-slate-500 text-center pt-2">
-              Use your admin credentials on the top right bar to sign in.
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full py-4 px-6 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-black text-sm uppercase tracking-wider rounded-2xl shadow-xl shadow-blue-600/25 flex items-center justify-center gap-2.5 transition cursor-pointer disabled:opacity-70"
+            >
+              {isLoading ? (
+                <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <>Sign in securely <ArrowRight className="w-5 h-5" /></>
+              )}
+            </button>
+          </form>
+
+          <div className="text-center pt-3 border-t border-slate-100">
+            <p className="text-xs text-slate-600 font-bold">
+              Need access? Contact your organization administrator.
             </p>
           </div>
-
         </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="bg-slate-900 border-t border-slate-800 text-center py-4 text-xs text-slate-500">
-        &copy; 2026 Customs Clearing ERP &bull; Powered by EFS Advanced Compliance Engine. All rights reserved.
-      </footer>
-
+      </div>
     </div>
   );
 }

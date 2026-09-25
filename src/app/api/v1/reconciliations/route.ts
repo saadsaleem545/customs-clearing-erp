@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
       orderBy: { statementDate: 'desc' },
       include: {
         party: {
-          select: { companyName: true, partyCode: true, ntn: true },
+          select: { id: true, companyName: true, partyCode: true, ntn: true },
         },
         items: {
           include: {
@@ -38,13 +38,14 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    // Flatten items so frontend matrix table gets all saved rows directly per party
+    // Flatten items and explicitly inject partyId so frontend filters match correctly
     const allItems: any[] = [];
     reconciliations.forEach(recon => {
       if (recon.items && recon.items.length > 0) {
         recon.items.forEach(item => {
           allItems.push({
             ...item,
+            partyId: recon.partyId, // <--- Crucial fix: Attached partyId to each flattened item row
             reconciliationNo: recon.reconciliationNo,
             statementDate: recon.statementDate,
           });
@@ -68,7 +69,6 @@ export async function POST(req: NextRequest) {
       exportGdId,
       exportQtyKg,
       exportValuePkr,
-      // Direct explicit matrix mappings sent from frontend
       importGdNumber,
       importParticulars,
       importHsCode,
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
       inputWithWastage,
       wastagePct: payloadWastagePct,
       wastagePctOverride,
-      analysisCertNo, // <--- Added here to receive from frontend payload
+      analysisCertNo,
     } = body;
 
     if (!partyId || !importMaterialId) {
@@ -166,12 +166,10 @@ export async function POST(req: NextRequest) {
     const importQty = new Decimal(payloadImportQty ?? inputMaterial.importedQty.toString());
     const importValuePkr = new Decimal(payloadImportValue ?? inputMaterial.importValuePkr.toString());
     
-    // Direct per-unit values from Analysis Certificate
     const netIocoConsumption = requirementQty !== undefined ? new Decimal(requirementQty) : new Decimal(0);
     const totalWastageKg = wastageQty !== undefined ? new Decimal(wastageQty) : new Decimal(0);
     const consumptionIncWastagePerUnit = inputWithWastage !== undefined ? new Decimal(inputWithWastage) : netIocoConsumption.plus(totalWastageKg);
 
-    // Total Consumption including wastage (Export Qty * Per Unit Input with Wastage)
     const totalConsumptionIncWastage = expQty.times(consumptionIncWastagePerUnit);
     const totalActualWastageKg = totalWastageKg.times(expQty);
 
@@ -187,7 +185,6 @@ export async function POST(req: NextRequest) {
       ? consumptionIncWastagePerUnit 
       : new Decimal(0);
 
-    // Value Addition Formula
     const costPerKgImport = importQty.greaterThan(0) ? importValuePkr.dividedBy(importQty) : new Decimal(0);
     const consumedImportValPkr = totalConsumptionIncWastage.times(costPerKgImport);
     
@@ -207,6 +204,7 @@ export async function POST(req: NextRequest) {
 
     // 4. Update Database inside Transaction
     const result = await prisma.$transaction(async (tx) => {
+      // Ensure we find or create the reconciliation header strictly for THIS partyId
       let reconHeader = await tx.reconciliation.findFirst({
         where: { partyId },
         orderBy: { statementDate: 'desc' },
@@ -244,8 +242,7 @@ export async function POST(req: NextRequest) {
           importQtyKg: importQty,
           importValuePkr: importValuePkr,
           inputPct: resolvedHsCode,
-          // Certificate reference values mapped properly
-          analysisCertNo: analysisCertNo || 'N/A', // <--- Properly mapped here
+          analysisCertNo: analysisCertNo || 'N/A',
           netIocoConsumption,
           iocoWastageQty: totalWastageKg,
           grossIocoConsumption: consumptionIncWastagePerUnit,
@@ -254,7 +251,6 @@ export async function POST(req: NextRequest) {
           exportDescription: exportDesc,
           exportQtyKg: expQty,
           exportValuePkr: actualExpVal,
-          // Saved as total multiplied quantities to display correctly in table
           consumptionIncWastage: totalConsumptionIncWastage,
           actualWastageKg: totalActualWastageKg,
           closingBalanceKg,
@@ -265,7 +261,6 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      // Update Stock Ledger Balances using multiplied total consumption
       await tx.inputMaterial.update({
         where: { id: inputMaterial.id },
         data: {
@@ -275,7 +270,10 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      return reconItem;
+      return {
+        ...reconItem,
+        partyId: reconHeader.partyId,
+      };
     });
 
     return NextResponse.json({ success: true, data: result }, { status: 201 });
@@ -297,7 +295,6 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    // Find all reconciliation headers for this party
     const recons = await prisma.reconciliation.findMany({
       where: { partyId },
       select: { id: true },
@@ -307,12 +304,10 @@ export async function DELETE(req: NextRequest) {
 
     if (reconIds.length > 0) {
       await prisma.$transaction(async (tx) => {
-        // Delete all associated items first
         await tx.reconciliationItem.deleteMany({
           where: { reconciliationId: { in: reconIds } },
         });
 
-        // Delete reconciliation headers
         await tx.reconciliation.deleteMany({
           where: { id: { in: reconIds } },
         });

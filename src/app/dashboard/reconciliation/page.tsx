@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Layers, Building2, Search, ChevronDown, X, CheckCircle, Circle, Calculator, Save, Loader2, Trash2, Edit3, FileText, Printer, Check, Download } from 'lucide-react';
+import { Layers, Building2, Search, ChevronDown, X, CheckCircle, Circle, Calculator, Save, Loader2, Trash2, Edit3, FileText, Printer, Check, Download, ArrowUpRight, RotateCcw } from 'lucide-react';
 
 export default function InputOutputDetailsPage() {
   const [parties, setParties] = useState<any[]>([]);
@@ -17,6 +17,11 @@ export default function InputOutputDetailsPage() {
   const [exportSearchQuery, setExportSearchQuery] = useState('');
   const [certSearchQuery, setCertSearchQuery] = useState('');
   const [statementsSearchQuery, setStatementsSearchQuery] = useState('');
+
+  // Advanced Filtering States for Reconciliation Section
+  const [filterPartyId, setFilterPartyId] = useState('ALL');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   const [partyImports, setPartyImports] = useState<any[]>([]);
   const [selectedGdObject, setSelectedGdObject] = useState<any>(null);
@@ -34,7 +39,7 @@ export default function InputOutputDetailsPage() {
   const [editWastagesKg, setEditWastagesKg] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // Matrix table records state
+  // Matrix table records state (global reconciliations if admin or party-specific)
   const [partyReconciliations, setPartyReconciliations] = useState<any[]>([]);
   const [loadingReconciliations, setLoadingReconciliations] = useState(false);
 
@@ -85,9 +90,10 @@ export default function InputOutputDetailsPage() {
   const totalConsumedValue = unitImportRate * totalConsumedQty;
   const valueAdditionPct = exportVal > 0 ? (totalConsumedValue / exportVal) * 100 : 0;
 
-  // Find current party object to retrieve EFS Certificate Number (NTN / certNo)
+  // Find current party object to retrieve EFS Certificate Number using valid Prisma schema fields (ntn / companyRegistrationNo)
   const currentPartyObj = parties.find(p => p.id === selectedPartyId);
-  const partyEfsCertNo = currentPartyObj?.ntn || currentPartyObj?.certNo || currentPartyObj?.partyCode || 'N/A';
+  const partyEfsCertNo = currentPartyObj?.ntn || currentPartyObj?.companyRegistrationNo || currentPartyObj?.partyCode || 'N/A';
+  const currentPartyNameText = currentPartyObj?.companyName || selectedPartyName || 'VALUED CLIENT';
 
   // Calculate live balance specifically for the currently selected Import GD item using rolling logic
   const currentGdReconciliations = useMemo(() => {
@@ -187,14 +193,18 @@ export default function InputOutputDetailsPage() {
   };
 
   const handleClearAllReconciliations = async () => {
-    if (!selectedPartyId) return;
-    if (!confirm(`Are you sure you want to clear all saved reconciliations for M/s. ${selectedPartyName}?`)) {
+    if (!selectedPartyId && filterPartyId === 'ALL') {
+      alert('Please select a party or filter first.');
+      return;
+    }
+    const targetParty = filterPartyId !== 'ALL' ? filterPartyId : selectedPartyId;
+    if (!confirm(`Are you sure you want to clear all saved reconciliations for this selection?`)) {
       return;
     }
 
     try {
       setIsClearing(true);
-      const response = await fetch(`/api/v1/reconciliations?partyId=${selectedPartyId}`, {
+      const response = await fetch(`/api/v1/reconciliations?partyId=${targetParty}`, {
         method: 'DELETE',
       });
 
@@ -208,7 +218,7 @@ export default function InputOutputDetailsPage() {
         throw new Error((result as any)?.error || 'Failed to clear reconciliations');
       }
 
-      setPartyReconciliations([]);
+      setPartyReconciliations(prev => prev.filter(r => r.partyId !== targetParty));
       setSuccessMessage('All reconciliations have been successfully cleared.');
     } catch (err: any) {
       console.error('Error clearing reconciliations:', err);
@@ -274,6 +284,25 @@ export default function InputOutputDetailsPage() {
     setEditWastagesKg(item.actualWastageKg || item.resolvedWastageQty || '');
   };
 
+  const handleExportQtyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newQtyStr = e.target.value;
+    setEditExportQty(newQtyStr);
+
+    if (!editingItem || newQtyStr === '') return;
+
+    const newQty = Number(newQtyStr);
+    const originalExportQty = Number(editingItem.exportQtyKg || editingItem.resolvedExportQty || editingItem.exportQty || 1) || 1;
+    const originalExportValue = Number(editingItem.exportValuePkr || 0);
+    const unitExportRate = originalExportValue / originalExportQty;
+    
+    const grossIorMultiplier = Number(editingItem.grossIocoConsumption || editingItem.inputWithWastage || 0);
+    const unitWastage = Number(editingItem.wastageQty || editingItem.iocoWastageQty || 0);
+
+    setEditExportValue((newQty * unitExportRate).toFixed(2));
+    setEditConsumptionIncWastage((newQty * grossIorMultiplier).toFixed(4));
+    setEditWastagesKg((newQty * unitWastage).toFixed(4));
+  };
+
   const handleUpdateRow = async () => {
     if (!editingItem) return;
 
@@ -321,22 +350,65 @@ export default function InputOutputDetailsPage() {
     WindowPrt?.document.write(`
       <html>
         <head>
-          <title>Reconciliation Statement</title>
+          <title>EFS Authorization Certificate Report</title>
           <style>
-            body { font-family: Arial, sans-serif; color: #000; padding: 20px; }
+            @media print {
+              @page { size: landscape; margin: 10mm; }
+              .no-print { display: none !important; }
+            }
+            body { font-family: Arial, sans-serif; color: #000; padding: 10px; }
             table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 11px; }
             th, td { border: 1px solid #333; padding: 6px 8px; text-align: left; }
-            th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
+            th { background-color: #f2f2f2; font-weight: bold; text-align: center; font-size: 12px; }
             .text-right { text-align: right; }
             .text-center { text-align: center; }
-            h2 { text-align: center; margin-bottom: 5px; }
-            p { text-align: center; font-size: 12px; color: #555; }
-            .no-print { display: none !important; }
+            h2 { text-align: center; margin-bottom: 5px; font-size: 18px; }
+            p { text-align: center; font-size: 13px; color: #555; }
           </style>
         </head>
         <body>
-          <h2>Reconciliation Statement - M/s. ${selectedPartyName}</h2>
           ${printContent.innerHTML}
+        </body>
+      </html>
+    `);
+    WindowPrt?.document.close();
+    WindowPrt?.focus();
+    setTimeout(() => {
+      WindowPrt?.print();
+      WindowPrt?.close();
+    }, 500);
+  };
+
+  const handlePrintAllFilteredStatements = () => {
+    const WindowPrt = window.open('', '', 'left=0,top=0,width=1200,height=900,toolbar=0,scrollbars=0,status=0');
+    const allTablesHtml = Object.keys(groupedReconciliations).map(key => {
+      const el = document.getElementById(`statement-table-${key}`);
+      return el ? el.innerHTML : '';
+    }).join('<hr style="margin: 40px 0; border: 2px dashed #333;" />');
+
+    WindowPrt?.document.write(`
+      <html>
+        <head>
+          <title>All Filtered EFS Statements</title>
+          <style>
+            @media print {
+              @page { size: landscape; margin: 10mm; }
+              .no-print { display: none !important; }
+            }
+            body { font-family: Arial, sans-serif; color: #000; padding: 10px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 11px; }
+            th, td { border: 1px solid #333; padding: 6px 8px; text-align: left; }
+            th { background-color: #f2f2f2; font-weight: bold; text-align: center; font-size: 12px; }
+            .text-right { text-align: right; }
+            .text-center { text-align: center; }
+            h2 { text-align: center; margin-bottom: 5px; font-size: 18px; }
+            p { text-align: center; font-size: 13px; color: #555; }
+          </style>
+        </head>
+        <body>
+          <h2>EFS Authorization Certificate Statements Report</h2>
+          <p>From: ${fromDate || 'N/A'} To: ${toDate || 'N/A'}</p>
+          ${allTablesHtml}
         </body>
       </html>
     `);
@@ -352,7 +424,7 @@ export default function InputOutputDetailsPage() {
     let csvContent = "data:text/csv;charset=utf-8,";
     
     csvContent += `""\n`;
-    csvContent += `,"Reconciliation Statement - M/s. ${selectedPartyName} (Imported Input Goods )"\n`;
+    csvContent += `,"RECONCILIATION STATEMENT M/s - ${currentPartyNameText}"\n`;
     csvContent += `,"EFS Authorization Cert No.: ${partyEfsCertNo}"\n\n`;
 
     const headers = [
@@ -416,7 +488,7 @@ export default function InputOutputDetailsPage() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Reconciliation_Statement_${importGdNo}.csv`);
+    link.setAttribute("download", `EFS_Statement_${importGdNo}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -433,10 +505,18 @@ export default function InputOutputDetailsPage() {
         const exportRes = await fetch('/api/v1/exports');
         const exportJson = await exportRes.json();
         if (exportJson.success) setExportGds(exportJson.data || []);
+
+        setLoadingReconciliations(true);
+        const reconRes = await fetch('/api/v1/reconciliations');
+        const reconJson = await reconRes.json();
+        if (reconJson.success) {
+          setPartyReconciliations(reconJson.data || []);
+        }
       } catch (err) {
         console.error('Error fetching initial data:', err);
       } finally {
         setLoadingParties(false);
+        setLoadingReconciliations(false);
       }
     };
     fetchData();
@@ -455,18 +535,15 @@ export default function InputOutputDetailsPage() {
       if (!partyId) {
         setPartyImports([]);
         setAnalysisCertificates([]);
-        setPartyReconciliations([]);
         handleClearImportTable();
         handleClearExportTable();
         handleClearCertTable();
         return;
       }
       try {
-        setLoadingReconciliations(true);
-        const [importRes, certRes, reconRes] = await Promise.all([
+        const [importRes, certRes] = await Promise.all([
           fetch(`/api/v1/imports?partyId=${partyId}`),
-          fetch(`/api/v1/analysis?partyId=${partyId}`),
-          fetch(`/api/v1/reconciliations?partyId=${partyId}`)
+          fetch(`/api/v1/analysis?partyId=${partyId}`)
         ]);
 
         const importJson = await importRes.json();
@@ -474,18 +551,8 @@ export default function InputOutputDetailsPage() {
 
         const certJson = await certRes.json();
         if (certJson.success) setAnalysisCertificates(certJson.data || []);
-
-        const reconJson = await reconRes.json();
-        if (reconJson.success) {
-          const recs = reconJson.data || [];
-          setPartyReconciliations(recs);
-        } else {
-          setPartyReconciliations([]);
-        }
       } catch (err) {
         console.error('Error fetching party dependent data:', err);
-      } finally {
-        setLoadingReconciliations(false);
       }
     };
 
@@ -553,16 +620,28 @@ export default function InputOutputDetailsPage() {
 
   const groupedReconciliations = useMemo(() => {
     const map: { [key: string]: any[] } = {};
+    
     partyReconciliations.forEach((rec: any) => {
+      if (filterPartyId !== 'ALL' && rec.partyId !== filterPartyId) {
+        return;
+      }
+
+      const recDateStr = rec.createdAt || rec.date || rec.updatedAt;
+      if (fromDate || toDate) {
+        if (!recDateStr) return;
+        const itemDate = new Date(recDateStr).toISOString().split('T')[0];
+        if (fromDate && itemDate < fromDate) return;
+        if (toDate && itemDate > toDate) return;
+      }
+
       const gdNo = rec.importGdNo || rec.importGdNumber || 'GENERAL_GD';
       const materialId = rec.inputMaterialId || rec.importMaterialId || 'item';
-      const itemDesc = rec.importParticulars || rec.inputDescription || 'Standard Item';
       const impQty = Number(rec.importQty || rec.importQtyKg || 0);
       
       const uniqueGroupKey = `${gdNo}___${materialId}___${impQty}`;
       
       const q = statementsSearchQuery.toLowerCase();
-      if (q && !uniqueGroupKey.toLowerCase().includes(q)) {
+      if (q && !uniqueGroupKey.toLowerCase().includes(q) && !(rec.importParticulars || '').toLowerCase().includes(q)) {
         return;
       }
 
@@ -570,37 +649,44 @@ export default function InputOutputDetailsPage() {
       map[uniqueGroupKey].push(rec);
     });
     return map;
-  }, [partyReconciliations, statementsSearchQuery]);
+  }, [partyReconciliations, filterPartyId, fromDate, toDate, statementsSearchQuery]);
 
   return (
-    <div className="space-y-8 max-w-[1700px] mx-auto font-sans p-6 text-slate-100">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col justify-between p-3 sm:p-6 space-y-6 sm:space-y-8 max-w-[1700px] mx-auto overflow-x-hidden">
       <style jsx global>{`
         ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #020617; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
-        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        @media print {
+          .no-print { display: none !important; }
+        }
       `}</style>
 
-      {/* Header Banner */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-400 mb-1">
-          <Layers className="w-3.5 h-3.5" /> EFS Advanced Compliance &bull; Input Output Ledger Matrix
+      {/* Top Banner Header */}
+      <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl shadow-xl overflow-hidden">
+        <div className="bg-gradient-to-r from-blue-700 via-blue-900 to-slate-950 p-5 sm:p-8 text-white flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 sm:gap-6">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20 text-blue-100 text-xs sm:text-sm font-black uppercase tracking-wider">
+              <ArrowUpRight className="w-4 h-4 text-cyan-400" /> EFS Advanced Compliance &bull; Input Output Ledger Matrix
+            </div>
+            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-tight">Input Output Details &amp; EFS Authorization Certificate Statement</h1>
+            <p className="text-sm sm:text-base text-blue-200 font-medium max-w-3xl">
+              Select Name of Trader, Import GD, Export GD, and Analysis Certificate to calculate and save items.
+            </p>
+          </div>
         </div>
-        <h1 className="text-2xl font-black text-white">Input Output Details &amp; Reconciliation Statement</h1>
-        <p className="text-xs text-slate-400 mt-1">
-          Select Name of Trader, Import GD, Export GD, and Analysis Certificate to calculate and save items.
-        </p>
       </div>
 
       {successMessage && (
-        <div className="bg-emerald-950/80 border border-emerald-500 text-emerald-300 px-6 py-4 rounded-2xl shadow-xl flex items-center justify-between animate-fadeIn">
+        <div className="bg-emerald-50 border-2 border-emerald-600 text-emerald-900 px-4 sm:px-6 py-3.5 sm:py-4 rounded-2xl shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fadeIn">
           <div className="flex items-center gap-3">
-            <CheckCircle className="w-5 h-5 text-emerald-400 flex-shrink-0" />
-            <span className="text-xs font-bold tracking-wide uppercase">{successMessage}</span>
+            <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+            <span className="text-xs sm:text-sm font-black tracking-wide uppercase">{successMessage}</span>
           </div>
           <button 
             onClick={() => setSuccessMessage(null)}
-            className="text-emerald-400 hover:text-white text-xs font-bold bg-emerald-900/50 px-3 py-1 rounded-lg border border-emerald-700/40 transition"
+            className="text-emerald-700 hover:text-emerald-900 text-xs font-black bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-300 transition cursor-pointer self-end sm:self-auto"
           >
             Dismiss
           </button>
@@ -608,13 +694,13 @@ export default function InputOutputDetailsPage() {
       )}
 
       {/* Trader Selection Block */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-        <div className="space-y-2 relative max-w-xl" ref={partyDropdownRef}>
-          <label className="block text-xs font-bold text-slate-300 uppercase tracking-wide flex items-center gap-1.5">
-            <Building2 className="w-4 h-4 text-blue-400" /> Name of Trader (Client Party) *
+      <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-4">
+        <div className="space-y-3 relative max-w-2xl" ref={partyDropdownRef}>
+          <label className="block text-xs sm:text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-blue-600" /> Name of Trader (Client Party) *
           </label>
           <div className="relative">
-            <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
+            <Search className="w-5 h-5 absolute left-4 top-4 text-slate-400" />
             <input
               type="text"
               placeholder={loadingParties ? "Loading parties..." : "Search or select trader..."}
@@ -625,36 +711,35 @@ export default function InputOutputDetailsPage() {
                 if (!e.target.value) {
                   setSelectedPartyId('');
                   setSelectedPartyName('');
-                  setPartyReconciliations([]);
                 }
               }}
               onFocus={() => setIsPartyOpen(true)}
-              className="w-full pl-10 pr-10 py-3 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-medium cursor-pointer"
+              className="w-full pl-12 pr-12 py-3.5 bg-slate-50 border-2 border-slate-300 rounded-xl text-xs sm:text-base font-bold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 cursor-pointer shadow-sm"
             />
             <div 
-              className="absolute right-3.5 top-3.5 cursor-pointer text-slate-400 hover:text-white"
+              className="absolute right-4 top-4 cursor-pointer text-slate-500 hover:text-slate-900"
               onClick={() => setIsPartyOpen(!isPartyOpen)}
             >
-              <ChevronDown className="w-4 h-4" />
+              <ChevronDown className="w-5 h-5" />
             </div>
           </div>
 
           {isPartyOpen && (
-            <div className="absolute left-0 right-0 mt-2 bg-slate-950 border border-slate-700 rounded-xl shadow-2xl z-50 max-h-60 overflow-y-auto divide-y divide-slate-800">
+            <div className="absolute left-0 right-0 mt-2 bg-white border-2 border-slate-900 rounded-xl shadow-2xl z-50 max-h-64 overflow-y-auto divide-y divide-slate-100">
               {filteredParties.length === 0 ? (
-                <div className="p-3 text-xs text-slate-400 text-center">No matching trader found.</div>
+                <div className="p-4 text-xs sm:text-sm text-slate-500 text-center font-bold">No matching trader found.</div>
               ) : (
                 filteredParties.map((party) => (
                   <div
                     key={party.id}
                     onClick={() => handleSelectParty(party)}
-                    className="p-3 text-xs text-slate-200 hover:bg-slate-800 cursor-pointer flex items-center justify-between transition"
+                    className="p-3.5 text-xs sm:text-sm text-slate-900 hover:bg-blue-50 cursor-pointer flex items-center justify-between transition font-bold"
                   >
                     <div>
-                      <span className="font-bold text-white block">{party.companyName}</span>
-                      <span className="text-[10px] text-slate-400 font-mono">Cert: {party.ntn || 'N/A'}</span>
+                      <span className="font-black text-slate-900 text-sm sm:text-base block">{party.companyName}</span>
+                      <span className="text-[11px] sm:text-xs text-slate-500 font-mono">Cert: {party.ntn || 'N/A'}</span>
                     </div>
-                    <span className="text-[10px] font-mono text-purple-400 bg-purple-950/40 px-2 py-0.5 rounded border border-purple-800/40">
+                    <span className="text-[11px] sm:text-xs font-mono text-blue-700 bg-blue-50 px-2.5 py-1 rounded border border-blue-200 font-black">
                       {party.partyCode}
                     </span>
                   </div>
@@ -666,15 +751,17 @@ export default function InputOutputDetailsPage() {
       </div>
 
       {selectedPartyId && (
-        <div className="space-y-6 max-w-full">
+        <div className="space-y-6 sm:space-y-8 max-w-full">
           
           {/* --- 1. Import GD Box --- */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase tracking-wide text-emerald-400">Select Import GD *</h3>
+          <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900 flex items-center gap-3">
+                <span className="w-3.5 h-3.5 rounded-full bg-blue-600"></span> Select Import GD *
+              </h3>
               {selectedGdObject && (
-                <span className="text-[10px] font-mono bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded border border-emerald-700/50 flex items-center gap-1">
-                  <Check className="w-3 h-3" /> Selected GD
+                <span className="text-xs sm:text-sm font-mono bg-blue-50 text-blue-700 px-3.5 py-1.5 rounded-xl border border-blue-300 font-black inline-flex items-center gap-2">
+                  <Check className="w-4 h-4" /> Selected GD: {selectedGdObject.gdNumber || selectedGdObject.importGdNumber}
                 </span>
               )}
             </div>
@@ -682,18 +769,18 @@ export default function InputOutputDetailsPage() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               <div className="lg:col-span-4 space-y-3">
                 <div className="relative">
-                  <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-500" />
+                  <Search className="w-4 h-4 absolute left-4 top-3.5 text-slate-400" />
                   <input
                     type="text"
                     placeholder="Search Import GD No..."
                     value={importSearchQuery}
                     onChange={(e) => setImportSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                    className="w-full pl-11 pr-4 py-3 bg-slate-50 border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600"
                   />
                 </div>
-                <div className="max-h-60 overflow-y-auto space-y-2">
+                <div className="max-h-72 overflow-y-auto space-y-2.5">
                   {filteredImports.length === 0 ? (
-                    <p className="text-xs text-slate-500 text-center py-2">No import GDs found.</p>
+                    <p className="text-xs text-slate-500 text-center py-4 font-bold bg-slate-50 rounded-xl border border-slate-200">No import GDs found.</p>
                   ) : (
                     filteredImports.map(imp => {
                       const isSelected = selectedGdObject?.id === imp.id;
@@ -703,13 +790,13 @@ export default function InputOutputDetailsPage() {
                         <div 
                           key={imp.id}
                           onClick={() => setSelectedGdObject(isSelected ? null : imp)}
-                          className={`p-3 rounded-xl text-xs cursor-pointer border transition flex justify-between items-center ${isSelected ? 'bg-emerald-950/50 border-emerald-500 text-white font-bold shadow-lg' : 'bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800'}`}
+                          className={`p-3.5 sm:p-4 rounded-xl text-xs sm:text-sm cursor-pointer border-2 transition flex justify-between items-center ${isSelected ? 'bg-blue-600 border-blue-900 text-white font-black shadow-lg' : 'bg-slate-50 border-slate-300 text-slate-900 hover:bg-slate-100 font-bold'}`}
                         >
                           <div className="truncate pr-2">
-                            <span className="block truncate font-mono text-emerald-400 font-bold">{gdNumberStr}</span>
-                            <span className="text-[10px] text-slate-400 font-normal">{itemsCount} items</span>
+                            <span className={`block truncate font-mono text-sm sm:text-base font-black ${isSelected ? 'text-white' : 'text-slate-900'}`}>{gdNumberStr}</span>
+                            <span className={`text-[11px] sm:text-xs mt-0.5 block ${isSelected ? 'text-blue-100' : 'text-slate-500'}`}>{itemsCount} items</span>
                           </div>
-                          <span className={`px-2.5 py-1 rounded-lg font-bold text-[10px] transition flex-shrink-0 ${isSelected ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300'}`}>
+                          <span className={`px-3 py-1 rounded-lg font-black text-xs transition flex-shrink-0 ${isSelected ? 'bg-white text-blue-700 shadow' : 'bg-slate-200 text-slate-800'}`}>
                             {isSelected ? 'Selected' : 'Select'}
                           </span>
                         </div>
@@ -721,34 +808,34 @@ export default function InputOutputDetailsPage() {
 
               <div className="lg:col-span-8">
                 {selectedGdObject ? (
-                  <div className="bg-slate-950 border border-emerald-500/40 rounded-2xl p-4 space-y-3 shadow-inner animate-fadeIn">
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div className={`bg-slate-50 rounded-2xl p-4 sm:p-6 space-y-4 shadow-sm transition-all duration-300 ${selectedImportItem ? 'border-4 border-blue-600 ring-4 ring-blue-100' : 'border-2 border-slate-300'}`}>
+                    <div className="flex items-center justify-between border-b border-slate-200 pb-3">
                       <div>
-                        <span className="text-xs font-black text-white uppercase tracking-wider block">Import GD Items Details</span>
-                        <span className="text-[11px] text-emerald-400 font-mono font-bold">GD: {selectedGdObject.gdNumber || selectedGdObject.importGdNumber}</span>
+                        <span className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider block">Import GD Items Details</span>
+                        <span className="text-xs sm:text-sm text-blue-700 font-mono font-black">GD: {selectedGdObject.gdNumber || selectedGdObject.importGdNumber}</span>
                       </div>
-                      <button onClick={handleClearImportTable} className="p-1.5 rounded-lg bg-slate-900 text-slate-400 hover:text-white transition">
-                        <X className="w-3.5 h-3.5" />
+                      <button onClick={handleClearImportTable} className="p-2 rounded-xl bg-slate-200 text-slate-700 hover:bg-slate-300 transition cursor-pointer">
+                        <X className="w-4 h-4 sm:w-5 sm:h-5" />
                       </button>
                     </div>
 
                     {!selectedGdObject.items || selectedGdObject.items.length === 0 ? (
-                      <p className="text-xs text-slate-500 text-center py-6">No items found for this GD.</p>
+                      <p className="text-xs sm:text-sm text-slate-500 text-center py-6 font-bold">No items found for this GD.</p>
                     ) : (
-                      <div className="overflow-x-auto rounded-xl">
-                        <table className="min-w-full divide-y divide-slate-800 text-xs">
-                          <thead>
-                            <tr className="text-slate-400 font-semibold text-left">
-                              <th className="px-3 py-2.5 w-10 text-center">Select</th>
-                              <th className="px-3 py-2.5">Sr #</th>
-                              <th className="px-3 py-2.5">Input Description</th>
-                              <th className="px-3 py-2.5">Input PCT</th>
-                              <th className="px-3 py-2.5 text-right">Import Qty</th>
-                              <th className="px-3 py-2.5">UOM</th>
-                              <th className="px-3 py-2.5 text-right">Import Value</th>
+                      <div className="overflow-x-auto border-2 border-slate-300 rounded-2xl shadow-sm bg-white">
+                        <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
+                          <thead className="bg-slate-900 text-white font-black uppercase text-[11px] sm:text-xs tracking-wider">
+                            <tr>
+                              <th className="px-3 sm:px-5 py-3.5 w-12 text-center">Select</th>
+                              <th className="px-3 sm:px-5 py-3.5 text-left">Sr #</th>
+                              <th className="px-3 sm:px-5 py-3.5 text-left">Input Description</th>
+                              <th className="px-3 sm:px-5 py-3.5 text-left">Input PCT</th>
+                              <th className="px-3 sm:px-5 py-3.5 text-right">Import Qty</th>
+                              <th className="px-3 sm:px-5 py-3.5 text-left">UOM</th>
+                              <th className="px-3 sm:px-5 py-3.5 text-right">Import Value</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-800 text-slate-200 font-medium">
+                          <tbody className="divide-y divide-slate-200 text-slate-900 font-medium">
                             {selectedGdObject.items.map((item: any, idx: number) => {
                               const description = item.itemDescription || item.particulars || item.description || 'Standard Import Item';
                               const hsCode = item.hsCode || item.hs_code || 'N/A';
@@ -761,19 +848,19 @@ export default function InputOutputDetailsPage() {
                                 <tr 
                                   key={item.id || idx} 
                                   onClick={() => handleSelectImportItem(item)}
-                                  className={`cursor-pointer transition ${isItemSel ? 'bg-emerald-950/40 border-l-2 border-emerald-400 font-bold' : 'hover:bg-slate-900/60'}`}
+                                  className={`cursor-pointer transition ${isItemSel ? 'bg-blue-50 font-black' : 'hover:bg-slate-50'}`}
                                 >
-                                  <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
-                                    <button type="button" onClick={() => handleSelectImportItem(item)} className="text-emerald-400 focus:outline-none">
-                                      {isItemSel ? <CheckCircle className="w-4 h-4 text-emerald-400 fill-emerald-400/20" /> : <Circle className="w-4 h-4 text-slate-600" />}
+                                  <td className="px-3 sm:px-5 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                    <button type="button" onClick={() => handleSelectImportItem(item)} className="text-blue-600 focus:outline-none cursor-pointer">
+                                      {isItemSel ? <CheckCircle className="w-5 h-5 text-blue-600 fill-blue-100" /> : <Circle className="w-5 h-5 text-slate-400" />}
                                     </button>
                                   </td>
-                                  <td className="px-3 py-2.5 text-slate-400">{idx + 1}</td>
-                                  <td className="px-3 py-2.5 text-white">{description}</td>
-                                  <td className="px-3 py-2.5 font-mono text-slate-300">{hsCode}</td>
-                                  <td className="px-3 py-2.5 text-right font-mono text-slate-100">{formatNumber(qty, 0)}</td>
-                                  <td className="px-3 py-2.5 font-mono text-slate-400">{uom}</td>
-                                  <td className="px-3 py-2.5 text-right font-mono text-slate-100">{formatNumber(val, 2)}</td>
+                                  <td className="px-3 sm:px-5 py-3.5 font-bold text-slate-700">{idx + 1}</td>
+                                  <td className="px-3 sm:px-5 py-3.5 font-black text-slate-900">{description}</td>
+                                  <td className="px-3 sm:px-5 py-3.5 font-mono font-black text-slate-900">{hsCode}</td>
+                                  <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(qty, 0)}</td>
+                                  <td className="px-3 sm:px-5 py-3.5 font-mono font-black text-slate-700">{uom}</td>
+                                  <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(val, 2)}</td>
                                 </tr>
                               );
                             })}
@@ -783,7 +870,7 @@ export default function InputOutputDetailsPage() {
                     )}
                   </div>
                 ) : (
-                  <div className="h-full min-h-[160px] bg-slate-950/50 border border-slate-800 border-dashed rounded-2xl flex items-center justify-center p-6 text-center text-xs text-slate-500">
+                  <div className="h-full min-h-[200px] bg-slate-50 border-2 border-slate-300 border-dashed rounded-2xl flex items-center justify-center p-6 text-center text-xs sm:text-sm font-bold text-slate-500">
                     Please select any Import GD from the list to view its details here.
                   </div>
                 )}
@@ -792,12 +879,14 @@ export default function InputOutputDetailsPage() {
           </div>
 
           {/* --- 2. Export GD Box --- */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase tracking-wide text-purple-400">Select Export GD *</h3>
+          <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900 flex items-center gap-3">
+                <span className="w-3.5 h-3.5 rounded-full bg-blue-600"></span> Select Export GD *
+              </h3>
               {selectedExportGdObject && (
-                <span className="text-[10px] font-mono bg-purple-950 text-purple-300 px-2 py-0.5 rounded border border-purple-700/50 flex items-center gap-1">
-                  <Check className="w-3 h-3" /> Selected Export GD
+                <span className="text-xs sm:text-sm font-mono bg-blue-50 text-blue-700 px-3.5 py-1.5 rounded-xl border border-blue-300 font-black inline-flex items-center gap-2">
+                  <Check className="w-4 h-4" /> Selected Export GD: {selectedExportGdObject.exportGdNumber || selectedExportGdObject.gdNumber}
                 </span>
               )}
             </div>
@@ -805,18 +894,18 @@ export default function InputOutputDetailsPage() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               <div className="lg:col-span-4 space-y-3">
                 <div className="relative">
-                  <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-500" />
+                  <Search className="w-4 h-4 absolute left-4 top-3.5 text-slate-400" />
                   <input
                     type="text"
                     placeholder="Search Export GD No..."
                     value={exportSearchQuery}
                     onChange={(e) => setExportSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                    className="w-full pl-11 pr-4 py-3 bg-slate-50 border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600"
                   />
                 </div>
-                <div className="max-h-60 overflow-y-auto space-y-2">
+                <div className="max-h-72 overflow-y-auto space-y-2.5">
                   {filteredExports.length === 0 ? (
-                    <p className="text-xs text-slate-500 text-center py-2">No export GDs found.</p>
+                    <p className="text-xs text-slate-500 text-center py-4 font-bold bg-slate-50 rounded-xl border border-slate-200">No export GDs found.</p>
                   ) : (
                     filteredExports.map(exp => {
                       const isSelected = selectedExportGdObject?.id === exp.id;
@@ -845,13 +934,13 @@ export default function InputOutputDetailsPage() {
                               }
                             }
                           }}
-                          className={`p-3 rounded-xl text-xs cursor-pointer border transition flex justify-between items-center ${isSelected ? 'bg-purple-950/50 border-purple-500 text-white font-bold shadow-lg' : 'bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800'}`}
+                          className={`p-3.5 sm:p-4 rounded-xl text-xs sm:text-sm cursor-pointer border-2 transition flex justify-between items-center ${isSelected ? 'bg-blue-600 border-blue-900 text-white font-black shadow-lg' : 'bg-slate-50 border-slate-300 text-slate-900 hover:bg-slate-100 font-bold'}`}
                         >
                           <div className="truncate pr-2">
-                            <span className="block truncate font-mono text-purple-400 font-bold">{expGdNumberStr}</span>
-                            <span className="text-[10px] text-slate-400 font-normal">{expItemsCount} items</span>
+                            <span className={`block truncate font-mono text-sm sm:text-base font-black ${isSelected ? 'text-white' : 'text-slate-900'}`}>{expGdNumberStr}</span>
+                            <span className={`text-[11px] sm:text-xs mt-0.5 block ${isSelected ? 'text-blue-100' : 'text-slate-500'}`}>{expItemsCount} items</span>
                           </div>
-                          <span className={`px-2.5 py-1 rounded-lg font-bold text-[10px] transition flex-shrink-0 ${isSelected ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'}`}>
+                          <span className={`px-3 py-1 rounded-lg font-black text-xs transition flex-shrink-0 ${isSelected ? 'bg-white text-blue-700 shadow' : 'bg-slate-200 text-slate-800'}`}>
                             {isSelected ? 'Selected' : 'Select'}
                           </span>
                         </div>
@@ -863,36 +952,36 @@ export default function InputOutputDetailsPage() {
 
               <div className="lg:col-span-8">
                 {selectedExportGdObject ? (
-                  <div className="bg-slate-950 border border-purple-500/40 rounded-2xl p-4 space-y-3 shadow-inner animate-fadeIn">
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div className={`bg-slate-50 rounded-2xl p-4 sm:p-6 space-y-4 shadow-sm transition-all duration-300 ${selectedExportItem ? 'border-4 border-blue-600 ring-4 ring-blue-100' : 'border-2 border-slate-300'}`}>
+                    <div className="flex items-center justify-between border-b border-slate-200 pb-3">
                       <div>
-                        <span className="text-xs font-black text-white uppercase tracking-wider block">Export GD Items Details</span>
-                        <span className="text-[11px] text-purple-400 font-mono font-bold">GD: {selectedExportGdObject.exportGdNumber || selectedExportGdObject.gdNumber}</span>
+                        <span className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider block">Export GD Items Details</span>
+                        <span className="text-xs sm:text-sm text-blue-700 font-mono font-black">GD: {selectedExportGdObject.exportGdNumber || selectedExportGdObject.gdNumber}</span>
                       </div>
-                      <button onClick={handleClearExportTable} className="p-1.5 rounded-lg bg-slate-900 text-slate-400 hover:text-white transition">
-                        <X className="w-3.5 h-3.5" />
+                      <button onClick={handleClearExportTable} className="p-2 rounded-xl bg-slate-200 text-slate-700 hover:bg-slate-300 transition cursor-pointer">
+                        <X className="w-4 h-4 sm:w-5 sm:h-5" />
                       </button>
                     </div>
 
                     {loadingExportDetails ? (
-                      <p className="text-xs text-slate-500 text-center py-6">Loading export details...</p>
+                      <p className="text-xs sm:text-sm text-slate-500 text-center py-6 font-bold">Loading export details...</p>
                     ) : !selectedExportGdObject.items || selectedExportGdObject.items.length === 0 ? (
-                      <p className="text-xs text-slate-500 text-center py-6">No export items found.</p>
+                      <p className="text-xs sm:text-sm text-slate-500 text-center py-6 font-bold">No export items found.</p>
                     ) : (
-                      <div className="overflow-x-auto rounded-xl">
-                        <table className="min-w-full divide-y divide-slate-800 text-xs">
-                          <thead>
-                            <tr className="text-slate-400 font-semibold text-left">
-                              <th className="px-3 py-2.5 w-10 text-center">Select</th>
-                              <th className="px-3 py-2.5">Sr #</th>
-                              <th className="px-3 py-2.5">Particulars</th>
-                              <th className="px-3 py-2.5">HS Code</th>
-                              <th className="px-3 py-2.5 text-right">Quantity</th>
-                              <th className="px-3 py-2.5">UOM</th>
-                              <th className="px-3 py-2.5 text-right">Value</th>
+                      <div className="overflow-x-auto border-2 border-slate-300 rounded-2xl shadow-sm bg-white">
+                        <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
+                          <thead className="bg-slate-900 text-white font-black uppercase text-[11px] sm:text-xs tracking-wider">
+                            <tr>
+                              <th className="px-3 sm:px-5 py-3.5 w-12 text-center">Select</th>
+                              <th className="px-3 sm:px-5 py-3.5 text-left">Sr #</th>
+                              <th className="px-3 sm:px-5 py-3.5 text-left">Particulars</th>
+                              <th className="px-3 sm:px-5 py-3.5 text-left">HS Code</th>
+                              <th className="px-3 sm:px-5 py-3.5 text-right">Quantity</th>
+                              <th className="px-3 sm:px-5 py-3.5 text-left">UOM</th>
+                              <th className="px-3 sm:px-5 py-3.5 text-right">Value</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-800 text-slate-200 font-medium">
+                          <tbody className="divide-y divide-slate-200 text-slate-900 font-medium">
                             {selectedExportGdObject.items.map((item: any, idx: number) => {
                               const description = item.exportParticulars || 'Export Item';
                               const hsCode = item.exportHsCode || 'N/A';
@@ -904,19 +993,19 @@ export default function InputOutputDetailsPage() {
                                 <tr 
                                   key={item.id || idx} 
                                   onClick={() => handleSelectExportItem(item)}
-                                  className={`cursor-pointer transition ${isItemSel ? 'bg-purple-950/40 border-l-2 border-purple-400 font-bold' : 'hover:bg-slate-900/60'}`}
+                                  className={`cursor-pointer transition ${isItemSel ? 'bg-blue-50 font-black' : 'hover:bg-slate-50'}`}
                                 >
-                                  <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
-                                    <button type="button" onClick={() => handleSelectExportItem(item)} className="focus:outline-none">
-                                      {isItemSel ? <CheckCircle className="w-4 h-4 text-purple-400 fill-purple-400/20" /> : <Circle className="w-4 h-4 text-slate-600" />}
+                                  <td className="px-3 sm:px-5 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                    <button type="button" onClick={() => handleSelectExportItem(item)} className="focus:outline-none cursor-pointer">
+                                      {isItemSel ? <CheckCircle className="w-5 h-5 text-blue-600 fill-blue-100" /> : <Circle className="w-5 h-5 text-slate-400" />}
                                     </button>
                                   </td>
-                                  <td className="px-3 py-2.5 text-slate-400">{idx + 1}</td>
-                                  <td className="px-3 py-2.5 text-white">{description}</td>
-                                  <td className="px-3 py-2.5 font-mono text-slate-300">{hsCode}</td>
-                                  <td className="px-3 py-2.5 text-right font-mono text-slate-100">{formatNumber(qty, 0)}</td>
-                                  <td className="px-3 py-2.5 font-mono text-slate-400">KG</td>
-                                  <td className="px-3 py-2.5 text-right font-mono text-slate-100">{formatNumber(val, 2)}</td>
+                                  <td className="px-3 sm:px-5 py-3.5 font-bold text-slate-700">{idx + 1}</td>
+                                  <td className="px-3 sm:px-5 py-3.5 font-black text-slate-900">{description}</td>
+                                  <td className="px-3 sm:px-5 py-3.5 font-mono font-black text-slate-900">{hsCode}</td>
+                                  <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(qty, 0)}</td>
+                                  <td className="px-3 sm:px-5 py-3.5 font-mono font-black text-slate-700">KG</td>
+                                  <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(val, 2)}</td>
                                 </tr>
                               );
                             })}
@@ -926,7 +1015,7 @@ export default function InputOutputDetailsPage() {
                     )}
                   </div>
                 ) : (
-                  <div className="h-full min-h-[160px] bg-slate-950/50 border border-slate-800 border-dashed rounded-2xl flex items-center justify-center p-6 text-center text-xs text-slate-500">
+                  <div className="h-full min-h-[200px] bg-slate-50 border-2 border-slate-300 border-dashed rounded-2xl flex items-center justify-center p-6 text-center text-xs sm:text-sm font-bold text-slate-500">
                     Please select any Export GD from the list to view its details here.
                   </div>
                 )}
@@ -935,12 +1024,14 @@ export default function InputOutputDetailsPage() {
           </div>
 
           {/* --- 3. Analysis Certificate Box --- */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase tracking-wide text-amber-400">Select Analysis Certificate *</h3>
+          <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900 flex items-center gap-3">
+                <span className="w-3.5 h-3.5 rounded-full bg-blue-600"></span> Select Analysis Certificate *
+              </h3>
               {selectedCertObject && (
-                <span className="text-[10px] font-mono bg-amber-950 text-amber-300 px-2 py-0.5 rounded border border-amber-700/50 flex items-center gap-1">
-                  <Check className="w-3 h-3" /> Selected Certificate
+                <span className="text-xs sm:text-sm font-mono bg-blue-50 text-blue-700 px-3.5 py-1.5 rounded-xl border border-blue-300 font-black inline-flex items-center gap-2">
+                  <Check className="w-4 h-4" /> Selected Certificate: {selectedCertObject.certificateNumber || selectedCertObject.certNumber}
                 </span>
               )}
             </div>
@@ -948,18 +1039,18 @@ export default function InputOutputDetailsPage() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               <div className="lg:col-span-4 space-y-3">
                 <div className="relative">
-                  <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-500" />
+                  <Search className="w-4 h-4 absolute left-4 top-3.5 text-slate-400" />
                   <input
                     type="text"
                     placeholder="Search Certificate No..."
                     value={certSearchQuery}
                     onChange={(e) => setCertSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                    className="w-full pl-11 pr-4 py-3 bg-slate-50 border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600"
                   />
                 </div>
-                <div className="max-h-60 overflow-y-auto space-y-2">
+                <div className="max-h-72 overflow-y-auto space-y-2.5">
                   {filteredCerts.length === 0 ? (
-                    <p className="text-xs text-slate-500 text-center py-2">No certificates found.</p>
+                    <p className="text-xs text-slate-500 text-center py-4 font-bold bg-slate-50 rounded-xl border border-slate-200">No certificates found.</p>
                   ) : (
                     filteredCerts.map(cert => {
                       const isSelected = selectedCertObject?.id === cert.id;
@@ -985,13 +1076,13 @@ export default function InputOutputDetailsPage() {
                               }
                             }
                           }}
-                          className={`p-3 rounded-xl text-xs cursor-pointer border transition flex justify-between items-center ${isSelected ? 'bg-amber-950/50 border-amber-500 text-white font-bold shadow-lg' : 'bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800'}`}
+                          className={`p-3.5 sm:p-4 rounded-xl text-xs sm:text-sm cursor-pointer border-2 transition flex justify-between items-center ${isSelected ? 'bg-blue-600 border-blue-900 text-white font-black shadow-lg' : 'bg-slate-50 border-slate-300 text-slate-900 hover:bg-slate-100 font-bold'}`}
                         >
                           <div className="truncate pr-2">
-                            <span className="block truncate font-mono text-amber-400 font-bold">{certNumberStr}</span>
-                            <span className="text-[10px] text-slate-400 font-normal">{certItemsCount} items</span>
+                            <span className={`block truncate font-mono text-sm sm:text-base font-black ${isSelected ? 'text-white' : 'text-slate-900'}`}>{certNumberStr}</span>
+                            <span className={`text-[11px] sm:text-xs mt-0.5 block ${isSelected ? 'text-blue-100' : 'text-slate-500'}`}>{certItemsCount} items</span>
                           </div>
-                          <span className={`px-2.5 py-1 rounded-lg font-bold text-[10px] transition flex-shrink-0 ${isSelected ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-300'}`}>
+                          <span className={`px-3 py-1 rounded-lg font-black text-xs transition flex-shrink-0 ${isSelected ? 'bg-white text-blue-700 shadow' : 'bg-slate-200 text-slate-800'}`}>
                             {isSelected ? 'Selected' : 'Select'}
                           </span>
                         </div>
@@ -1003,36 +1094,36 @@ export default function InputOutputDetailsPage() {
 
               <div className="lg:col-span-8">
                 {selectedCertObject ? (
-                  <div className="bg-slate-950 border border-amber-500/40 rounded-2xl p-4 space-y-3 shadow-inner animate-fadeIn">
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div className={`bg-slate-50 rounded-2xl p-4 sm:p-6 space-y-4 shadow-sm transition-all duration-300 ${selectedCertItem ? 'border-4 border-blue-600 ring-4 ring-blue-100' : 'border-2 border-slate-300'}`}>
+                    <div className="flex items-center justify-between border-b border-slate-200 pb-3">
                       <div>
-                        <span className="text-xs font-black text-white uppercase tracking-wider block">Analysis Certificate Items Details</span>
-                        <span className="text-[11px] text-amber-400 font-mono font-bold">Cert #: {selectedCertObject.certificateNumber || selectedCertObject.certNumber}</span>
+                        <span className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider block">Analysis Certificate Items Details</span>
+                        <span className="text-xs sm:text-sm text-blue-700 font-mono font-black">Cert #: {selectedCertObject.certificateNumber || selectedCertObject.certNumber}</span>
                       </div>
-                      <button onClick={handleClearCertTable} className="p-1.5 rounded-lg bg-slate-900 text-slate-400 hover:text-white transition">
-                        <X className="w-3.5 h-3.5" />
+                      <button onClick={handleClearCertTable} className="p-2 rounded-xl bg-slate-200 text-slate-700 hover:bg-slate-300 transition cursor-pointer">
+                        <X className="w-4 h-4 sm:w-5 sm:h-5" />
                       </button>
                     </div>
 
                     {(!selectedCertObject.items && !selectedCertObject.certificateItems) || 
                        ((selectedCertObject.items?.length || 0) === 0 && (selectedCertObject.certificateItems?.length || 0) === 0) ? (
-                      <p className="text-xs text-slate-500 text-center py-6">No certificate items found.</p>
+                      <p className="text-xs sm:text-sm text-slate-500 text-center py-6 font-bold">No certificate items found.</p>
                     ) : (
-                      <div className="overflow-x-auto rounded-xl">
-                        <table className="min-w-full divide-y divide-slate-800 text-xs">
-                          <thead>
-                            <tr className="text-slate-400 font-semibold text-left">
-                              <th className="px-3 py-2.5 w-10 text-center">Select</th>
-                              <th className="px-3 py-2.5">Sr #</th>
-                              <th className="px-3 py-2.5">Particulars</th>
-                              <th className="px-3 py-2.5">HS Code</th>
-                              <th className="px-3 py-2.5 text-right">Consumption (Net IOR)</th>
-                              <th className="px-3 py-2.5 text-right">Wastages</th>
-                              <th className="px-3 py-2.5 text-right">Total (Gross IOR)</th>
-                              <th className="px-3 py-2.5 text-right">%age</th>
+                      <div className="overflow-x-auto border-2 border-slate-300 rounded-2xl shadow-sm bg-white">
+                        <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
+                          <thead className="bg-slate-900 text-white font-black uppercase text-[11px] sm:text-xs tracking-wider">
+                            <tr>
+                              <th className="px-3 sm:px-5 py-3.5 w-12 text-center">Select</th>
+                              <th className="px-3 sm:px-5 py-3.5 text-left">Sr #</th>
+                              <th className="px-3 sm:px-5 py-3.5 text-left">Particulars</th>
+                              <th className="px-3 sm:px-5 py-3.5 text-left">HS Code</th>
+                              <th className="px-3 sm:px-5 py-3.5 text-right">Consumption (Net IOR)</th>
+                              <th className="px-3 sm:px-5 py-3.5 text-right">Wastages</th>
+                              <th className="px-3 sm:px-5 py-3.5 text-right">Total (Gross IOR)</th>
+                              <th className="px-3 sm:px-5 py-3.5 text-right">%age</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-800 text-slate-200 font-medium">
+                          <tbody className="divide-y divide-slate-200 text-slate-900 font-medium">
                             {(selectedCertObject.items || selectedCertObject.certificateItems || []).map((item: any, idx: number) => {
                               const description = item.itemDescription || item.particulars || item.description || 'Certificate Item';
                               const hsCode = item.hsCode || item.hs_code || 'N/A';
@@ -1046,20 +1137,20 @@ export default function InputOutputDetailsPage() {
                                 <tr 
                                   key={item.id || idx} 
                                   onClick={() => handleSelectCertItem(item)}
-                                  className={`cursor-pointer transition ${isItemSel ? 'bg-amber-950/40 border-l-2 border-amber-400 font-bold' : 'hover:bg-slate-900/60'}`}
+                                  className={`cursor-pointer transition ${isItemSel ? 'bg-blue-50 font-black' : 'hover:bg-slate-50'}`}
                                 >
-                                  <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
-                                    <button type="button" onClick={() => handleSelectCertItem(item)} className="text-amber-400 focus:outline-none">
-                                      {isItemSel ? <CheckCircle className="w-4 h-4 text-amber-400 fill-amber-400/20" /> : <Circle className="w-4 h-4 text-slate-600" />}
+                                  <td className="px-3 sm:px-5 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                    <button type="button" onClick={() => handleSelectCertItem(item)} className="text-blue-600 focus:outline-none cursor-pointer">
+                                      {isItemSel ? <CheckCircle className="w-5 h-5 text-blue-600 fill-blue-100" /> : <Circle className="w-5 h-5 text-slate-400" />}
                                     </button>
                                   </td>
-                                  <td className="px-3 py-2.5 text-slate-400">{idx + 1}</td>
-                                  <td className="px-3 py-2.5 text-white">{description}</td>
-                                  <td className="px-3 py-2.5 font-mono text-slate-300">{hsCode}</td>
-                                  <td className="px-3 py-2.5 text-right font-mono font-bold text-cyan-400">{formatNumber(qty, 4)}</td>
-                                  <td className="px-3 py-2.5 text-right font-mono text-amber-400">{formatNumber(wastQty, 4)}</td>
-                                  <td className="px-3 py-2.5 text-right font-mono font-bold text-blue-400">{formatNumber(inputWast, 4)}</td>
-                                  <td className="px-3 py-2.5 text-right font-mono text-emerald-400">{formatNumber(wastage, 2)}%</td>
+                                  <td className="px-3 sm:px-5 py-3.5 font-bold text-slate-700">{idx + 1}</td>
+                                  <td className="px-3 sm:px-5 py-3.5 font-black text-slate-900">{description}</td>
+                                  <td className="px-3 sm:px-5 py-3.5 font-mono font-black text-slate-900">{hsCode}</td>
+                                  <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-blue-700">{formatNumber(qty, 4)}</td>
+                                  <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-700">{formatNumber(wastQty, 4)}</td>
+                                  <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(inputWast, 4)}</td>
+                                  <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-emerald-700">{formatNumber(wastage, 2)}%</td>
                                 </tr>
                               );
                             })}
@@ -1069,7 +1160,7 @@ export default function InputOutputDetailsPage() {
                     )}
                   </div>
                 ) : (
-                  <div className="h-full min-h-[160px] bg-slate-950/50 border border-slate-800 border-dashed rounded-2xl flex items-center justify-center p-6 text-center text-xs text-slate-500">
+                  <div className="h-full min-h-[200px] bg-slate-50 border-2 border-slate-300 border-dashed rounded-2xl flex items-center justify-center p-6 text-center text-xs sm:text-sm font-bold text-slate-500">
                     Please select any Analysis Certificate from the list to view its details here.
                   </div>
                 )}
@@ -1082,370 +1173,430 @@ export default function InputOutputDetailsPage() {
 
       {/* --- AUTOMATED CONSUMPTION & RECONCILIATION SUMMARY CARD --- */}
       {selectedExportItem && selectedCertItem && (
-        <div className="bg-gradient-to-r from-slate-900 via-blue-950/40 to-slate-900 border-2 border-cyan-500/50 rounded-2xl p-6 shadow-2xl space-y-6 mt-8 animate-fadeIn">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-cyan-500/30 pb-4 gap-4">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-cyan-500/20 text-cyan-400 rounded-xl border border-cyan-500/30">
-                <Calculator className="w-5 h-5" />
+        <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-2xl space-y-6 mt-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-200 pb-4 gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl border border-blue-200">
+                <Calculator className="w-6 h-6 sm:w-7 sm:h-7" />
               </div>
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-widest bg-cyan-900/60 text-cyan-300 px-2.5 py-1 rounded-full border border-cyan-700/50">
+                <span className="text-[11px] sm:text-xs font-black uppercase tracking-widest bg-blue-100 text-blue-800 px-3 py-1 rounded-full border border-blue-300">
                   Automated Reconciliation Engine
                 </span>
-                <h3 className="text-lg font-black text-white mt-1.5">Consumption &amp; Wastage Calculation Summary</h3>
+                <h3 className="text-xl sm:text-2xl font-black text-slate-900 mt-2">Consumption &amp; Wastage Calculation Summary</h3>
               </div>
             </div>
 
-            <div className="flex items-center gap-3 self-end sm:self-center">
-              <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-700/50 inline-block">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+              <span className="text-xs sm:text-sm font-mono font-black text-emerald-800 bg-emerald-100 px-4 py-2.5 rounded-xl border border-emerald-300 text-center">
                 COMPLIANCE VERIFIED
               </span>
               <button
                 type="button"
                 onClick={handleSaveReconciliation}
                 disabled={isSaving}
-                className={`flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs rounded-xl shadow-lg border border-cyan-400/40 transition transform active:scale-95 ${isSaving ? 'opacity-75 cursor-not-allowed' : ''}`}
+                className="flex items-center justify-center gap-2 px-6 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs sm:text-sm uppercase tracking-wider rounded-2xl shadow-xl transition cursor-pointer disabled:opacity-50"
               >
-                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} 
+                {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} 
                 {isSaving ? 'Saving...' : 'Save Reconciliation'}
               </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1.5 text-center sm:text-left">
-              <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold">Export Quantity (GD)</span>
-              <span className="font-mono font-bold text-purple-400 text-base block mt-1">{formatNumber(exportQty, 0)} KG</span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            <div className="bg-slate-50 p-4 sm:p-6 rounded-2xl border-2 border-slate-300 hover:border-blue-500 transition space-y-2">
+              <span className="text-xs sm:text-sm text-slate-700 uppercase tracking-wider block font-black">Export Quantity (GD)</span>
+              <span className="font-mono font-black text-slate-900 text-lg sm:text-xl block">{formatNumber(exportQty, 0)} KG</span>
             </div>
 
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1.5 text-center sm:text-left">
-              <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold">Consumption as per IOCO (Net IOR)</span>
-              <span className="font-mono font-bold text-cyan-400 text-base block mt-1">{formatNumber(certReqQty, 4)}</span>
+            <div className="bg-slate-50 p-4 sm:p-6 rounded-2xl border-2 border-blue-300 hover:border-blue-600 transition space-y-2">
+              <span className="text-xs sm:text-sm text-slate-700 uppercase tracking-wider block font-black">Consumption as per IOCO (Net IOR)</span>
+              <span className="font-mono font-black text-blue-700 text-lg sm:text-xl block">{formatNumber(certReqQty, 4)}</span>
             </div>
 
-            <div className="bg-cyan-950/30 border border-cyan-500/40 p-4 rounded-xl space-y-1.5 text-center sm:text-left">
-              <span className="text-[10px] text-cyan-300 uppercase tracking-wider font-bold block">Total Consumed Qty</span>
-              <span className="font-mono font-black text-cyan-400 text-base block mt-1">{formatNumber(totalConsumedQty, 4)} KG</span>
+            <div className="bg-blue-50 border-2 border-blue-500 ring-2 ring-blue-100 p-4 sm:p-6 rounded-2xl space-y-2">
+              <span className="text-xs sm:text-sm text-blue-800 uppercase tracking-wider font-black block">Total Consumed Qty</span>
+              <span className="font-mono font-black text-blue-700 text-lg sm:text-xl block">{formatNumber(totalConsumedQty, 4)} KG</span>
             </div>
 
-            <div className="bg-blue-950/30 border border-blue-500/40 p-4 rounded-xl space-y-1.5 text-center sm:text-left">
-              <span className="text-[10px] text-blue-300 uppercase tracking-wider block font-bold">Total Consumed Value</span>
-              <span className="font-mono font-black text-blue-400 text-base block mt-1">{formatNumber(totalConsumedValue, 2)}</span>
+            <div className="bg-slate-50 p-4 sm:p-6 rounded-2xl border-2 border-slate-300 hover:border-blue-500 transition space-y-2">
+              <span className="text-xs sm:text-sm text-slate-700 uppercase tracking-wider block font-black">Total Consumed Value</span>
+              <span className="font-mono font-black text-slate-900 text-lg sm:text-xl block">{formatNumber(totalConsumedValue, 2)}</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 justify-center max-w-5xl mx-auto">
-            <div className="bg-amber-950/30 border border-amber-500/40 p-4 rounded-xl space-y-1.5 text-center">
-              <span className="text-[10px] text-amber-300 uppercase tracking-wider block font-bold text-center">Total Wastage Qty</span>
-              <span className="font-mono font-black text-amber-400 text-base block mt-1 text-center">{formatNumber(totalWastageQty, 4)} KG</span>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 max-w-5xl mx-auto pt-2">
+            <div className="bg-slate-50 border-2 border-slate-300 hover:border-amber-500 transition p-4 sm:p-6 rounded-2xl space-y-2 text-center">
+              <span className="text-xs sm:text-sm text-slate-700 uppercase tracking-wider block font-black">Total Wastage Qty</span>
+              <span className="font-mono font-black text-slate-900 text-lg sm:text-xl block">{formatNumber(totalWastageQty, 4)} KG</span>
             </div>
 
-            <div className="bg-teal-950/30 border border-teal-500/40 p-4 rounded-xl space-y-1.5 text-center">
-              <span className="text-[10px] text-teal-300 uppercase tracking-wider block text-center">Balanced Quantity</span>
-              <span className="font-mono font-black text-teal-400 text-base block mt-1 text-center">{formatNumber(displayBalancedQty, 4)} KG</span>
+            <div className="bg-slate-50 border-2 border-emerald-400 hover:border-emerald-600 transition p-4 sm:p-6 rounded-2xl space-y-2 text-center">
+              <span className="text-xs sm:text-sm text-slate-700 uppercase tracking-wider block font-black">Balanced Quantity</span>
+              <span className="font-mono font-black text-emerald-700 text-lg sm:text-xl block">{formatNumber(displayBalancedQty, 4)} KG</span>
             </div>
 
-            <div className="bg-indigo-950/30 border border-indigo-500/40 p-4 rounded-xl space-y-1.5 text-center">
-              <span className="text-[10px] text-indigo-300 uppercase tracking-wider block text-center">Balanced Value</span>
-              <span className="font-mono font-black text-indigo-400 text-base block mt-1 text-center">{formatNumber(displayBalancedValue, 2)}</span>
+            <div className="bg-slate-50 border-2 border-slate-300 hover:border-blue-500 transition p-4 sm:p-6 rounded-2xl space-y-2 text-center">
+              <span className="text-xs sm:text-sm text-slate-700 uppercase tracking-wider block font-black">Balanced Value</span>
+              <span className="font-mono font-black text-slate-900 text-lg sm:text-xl block">{formatNumber(displayBalancedValue, 2)}</span>
             </div>
           </div>
         </div>
       )}
 
-      {/* --- SEPARATE RECONCILIATION STATEMENTS MATRIX TABLES FOR EACH ITEM WITH CLEAR & PRINT BUTTONS --- */}
-      {selectedPartyId && (
-        <div className="space-y-10 mt-10">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div>
-                <h2 className="text-xl font-black text-white">Party Reconciliation Statements (By Item &amp; GD)</h2>
-                <p className="text-xs text-emerald-400 font-bold uppercase tracking-wider mt-0.5">
-                  Trader: {selectedPartyName} &bull; Separate statement generated for each unique import item.
-                </p>
-              </div>
-              
+      {/* --- RECONCILIATION STATEMENTS MATRIX TABLES WITH PARTY & DATE FILTERS --- */}
+      <div className="space-y-6 sm:space-y-10 mt-10">
+        <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6">
+          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-slate-200 pb-5">
+            <div>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900">EFS Authorization Certificate Statements</h2>
+              <p className="text-xs sm:text-sm text-blue-700 font-black uppercase tracking-wider mt-1">
+                Filter statements by Party and Date Range below.
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
+              <button
+                type="button"
+                onClick={handlePrintAllFilteredStatements}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs sm:text-sm uppercase tracking-wider rounded-xl transition cursor-pointer shadow-lg"
+              >
+                <Printer className="w-4 h-4 sm:w-5 sm:h-5" /> Print All Filtered
+              </button>
+
               {partyReconciliations.length > 0 && (
                 <button
                   type="button"
                   onClick={handleClearAllReconciliations}
                   disabled={isClearing}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-red-950/60 hover:bg-red-900 text-red-300 font-bold text-xs rounded-xl border border-red-700/50 transition cursor-pointer shadow-lg"
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-3.5 bg-red-600 hover:bg-red-700 text-white font-black text-xs sm:text-sm uppercase tracking-wider rounded-xl transition cursor-pointer shadow-lg"
                 >
-                  {isClearing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                  {isClearing ? 'Clearing All...' : 'Clear All Statements'}
+                  {isClearing ? <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" /> : <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />}
+                  {isClearing ? 'Clearing...' : 'Clear Statements'}
                 </button>
               )}
             </div>
+          </div>
 
-            {/* Search Filter Bar for Import Statements */}
-            <div className="relative max-w-md pt-2">
-              <Search className="w-4 h-4 absolute left-3.5 top-5 text-slate-400" />
+          {/* FILTER BAR */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end bg-slate-50 p-4 sm:p-6 rounded-2xl border-2 border-slate-200">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-black text-slate-800 uppercase tracking-wider">Filter By Party</label>
+              <select
+                value={filterPartyId}
+                onChange={(e) => setFilterPartyId(e.target.value)}
+                className="w-full p-3 bg-white border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-600 cursor-pointer shadow-sm"
+              >
+                <option value="ALL">-- All Parties --</option>
+                {parties.map(p => (
+                  <option key={p.id} value={p.id}>{p.companyName}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-black text-slate-800 uppercase tracking-wider">From Date</label>
               <input
-                type="text"
-                placeholder="Search statements by GD No or Item..."
-                value={statementsSearchQuery}
-                onChange={(e) => setStatementsSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-medium"
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="w-full p-3 bg-white border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm font-mono"
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-black text-slate-800 uppercase tracking-wider">To Date</label>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="w-full p-3 bg-white border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm font-mono"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterPartyId('ALL');
+                  setFromDate('');
+                  setToDate('');
+                  setStatementsSearchQuery('');
+                }}
+                className="w-full flex items-center justify-center gap-2 py-3 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl font-black text-xs uppercase tracking-wider transition cursor-pointer border border-slate-300 shadow-sm"
+              >
+                <RotateCcw className="w-4 h-4" /> Reset Filters
+              </button>
             </div>
           </div>
 
-          {loadingReconciliations ? (
-            <div className="text-center py-12 text-slate-400 text-xs bg-slate-900 border border-slate-800 rounded-2xl shadow-xl">
-              Loading saved reconciliations from database...
-            </div>
-          ) : Object.keys(groupedReconciliations).length === 0 ? (
-            <div className="text-center py-12 text-slate-400 text-xs bg-slate-900 border border-slate-800 rounded-2xl shadow-xl">
-              No matching reconciliation statements found.
-            </div>
-          ) : (
-            Object.entries(groupedReconciliations).map(([groupKey, records]: [string, any[]]) => {
-              const [importGdNo, materialId, impQtyStr] = groupKey.split('___');
+          <div className="relative max-w-full">
+            <Search className="w-5 h-5 absolute left-4 top-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search statements by GD No or Item..."
+              value={statementsSearchQuery}
+              onChange={(e) => setStatementsSearchQuery(e.target.value)}
+              className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600"
+            />
+          </div>
+        </div>
+
+        {loadingReconciliations ? (
+          <div className="text-center py-12 text-slate-500 text-sm font-bold bg-white border-2 sm:border-4 border-slate-900 rounded-2xl shadow-xl">
+            Loading saved reconciliations from database...
+          </div>
+        ) : Object.keys(groupedReconciliations).length === 0 ? (
+          <div className="text-center py-12 text-slate-500 text-sm font-bold bg-white border-2 sm:border-4 border-slate-900 rounded-2xl shadow-xl">
+            No matching reconciliation statements found for the selected filter.
+          </div>
+        ) : (
+          Object.entries(groupedReconciliations).map(([groupKey, records]: [string, any[]]) => {
+            const [importGdNo, materialId, impQtyStr] = groupKey.split('___');
+            
+            let runningBalance = 0;
+
+            const rows = records.map((rec: any, idx: number) => {
+              const impQty = Number(rec.importQty || rec.importQtyKg || impQtyStr || 0);
+
+              const recExportQty = Number(rec.exportQtyKg || rec.exportQty || 0);
+              const recTotalConsumedQty = Number(rec.consumptionIncWastage || rec.totalConsumedQty || (recExportQty * Number(rec.grossIocoConsumption || rec.netIocoConsumption || 0)) || 0);
               
-              let runningBalance = 0;
+              let recWastageQty = Number(rec.actualWastageKg || rec.totalWastageQty || 0);
+              if (recWastageQty === 0 || recWastageQty < 1) {
+                const unitWast = Number(rec.wastageQty || rec.iocoWastageQty || 0);
+                recWastageQty = recExportQty * unitWast;
+              }
 
-              const rows = records.map((rec: any, idx: number) => {
-                const impQty = Number(rec.importQty || rec.importQtyKg || impQtyStr || 0);
+              if (idx === 0) {
+                runningBalance = impQty - recTotalConsumedQty;
+              } else {
+                runningBalance = runningBalance - recTotalConsumedQty;
+              }
 
-                const recExportQty = Number(rec.exportQtyKg || rec.exportQty || 0);
-                const recTotalConsumedQty = Number(rec.consumptionIncWastage || rec.totalConsumedQty || (recExportQty * Number(rec.grossIocoConsumption || rec.netIocoConsumption || 0)) || 0);
-                
-                let recWastageQty = Number(rec.actualWastageKg || rec.totalWastageQty || 0);
-                if (recWastageQty === 0 || recWastageQty < 1) {
-                  const unitWast = Number(rec.wastageQty || rec.iocoWastageQty || 0);
-                  recWastageQty = recExportQty * unitWast;
-                }
+              return {
+                ...rec,
+                resolvedExportQty: recExportQty,
+                resolvedTotalConsumed: recTotalConsumedQty,
+                resolvedWastageQty: recWastageQty,
+                computedClosingBalance: runningBalance,
+              };
+            });
 
-                // Har naye GD/Group ki pehli entry par fresh Import Qty se calculation start hogi
-                if (idx === 0) {
-                  runningBalance = impQty - recTotalConsumedQty;
-                } else {
-                  runningBalance = runningBalance - recTotalConsumedQty;
-                }
+            const itemDesc = rows[0]?.importParticulars || rows[0]?.inputDescription || 'Standard Item';
 
-                return {
-                  ...rec,
-                  resolvedExportQty: recExportQty,
-                  resolvedTotalConsumed: recTotalConsumedQty,
-                  resolvedWastageQty: recWastageQty,
-                  computedClosingBalance: runningBalance,
-                };
-              });
-
-              const itemDesc = rows[0]?.importParticulars || rows[0]?.inputDescription || 'Standard Item';
-
-              return (
-                <div key={groupKey} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-800 pb-4 gap-3">
-                    <div className="flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-emerald-400" />
-                      <h3 className="text-sm font-black text-white uppercase tracking-wide">
-                        EFS Authorization Cert No.: <span className="text-emerald-400 font-mono">{partyEfsCertNo}</span> &bull; GD: <span className="text-emerald-400 font-mono">{importGdNo}</span> &bull; Item: <span className="text-cyan-400">{itemDesc}</span> &bull; Qty: <span className="text-amber-400 font-mono">{formatNumber(impQtyStr, 0)}</span>
-                      </h3>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-start sm:justify-end">
-                      <span className="text-xs font-mono bg-slate-950 px-3 py-1 rounded-lg border border-slate-800 text-slate-300">
-                        Total Entries: {rows.length}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleExportExcel(groupKey, rows, importGdNo, itemDesc)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow transition cursor-pointer"
-                        title="Export to Excel"
-                      >
-                        <Download className="w-3.5 h-3.5" /> Export to Excel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handlePrintStatement(groupKey)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow transition cursor-pointer"
-                        title="Print Statement"
-                      >
-                        <Printer className="w-3.5 h-3.5" /> Print Statement
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleClearSingleGdStatement(groupKey, records)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-950/80 hover:bg-red-900 text-red-300 font-bold text-xs rounded-xl border border-red-700/50 shadow transition cursor-pointer"
-                        title="Clear Statement"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" /> Clear Statement
-                      </button>
-                    </div>
+            return (
+              <div key={groupKey} className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6">
+                <div className="flex flex-col xl:flex-row xl:items-center justify-between border-b border-slate-200 pb-5 gap-4">
+                  <div className="flex items-center gap-3">
+                    <FileText className="w-6 h-6 text-blue-600 flex-shrink-0" />
+                    <h3 className="text-xs sm:text-base font-black text-slate-900 uppercase tracking-wide">
+                      GD: <span className="text-blue-700 font-mono">{importGdNo}</span> &bull; Item: <span className="text-slate-800">{itemDesc}</span> &bull; Qty: <span className="text-blue-700 font-mono">{formatNumber(impQtyStr, 0)}</span>
+                    </h3>
                   </div>
 
-                  <div id={`statement-table-${groupKey}`} className="overflow-x-auto rounded-xl bg-slate-950 border border-slate-800">
-                    <table className="min-w-full divide-y divide-slate-800 text-xs">
-                      <thead>
-                        <tr className="bg-slate-950 border-b border-slate-800">
-                          <th colSpan={20} className="py-5 px-4 text-center text-white font-black text-base tracking-wider uppercase">
-                            (EFS Authorization Cert No.: {partyEfsCertNo})
-                          </th>
-                        </tr>
-
-                        <tr className="bg-slate-950 text-slate-300 font-bold uppercase tracking-wider border-b border-slate-800 text-center">
-                          <th></th>
-                          <th colSpan={5} className="bg-emerald-950/40 text-emerald-400 px-3 py-2">Input</th>
-                          <th colSpan={4} className="bg-cyan-950/40 text-cyan-400 px-3 py-2">IOR</th>
-                          <th colSpan={6} className="bg-purple-950/40 text-purple-400 px-3 py-2">Output</th>
-                          <th colSpan={2} className="bg-teal-950/40 text-teal-400 px-3 py-2">Balance &amp; Value</th>
-                          <th className="bg-slate-900 text-slate-300 px-3 py-2 no-print">Actions</th>
-                        </tr>
-
-                        <tr className="text-slate-400 font-semibold text-left bg-slate-900/60">
-                          <th className="px-3 py-3.5 text-center w-12">S. No.</th>
-                          <th className="px-3 py-3.5">Import GD No.</th>
-                          <th className="px-3 py-3.5">Input Description</th>
-                          <th className="px-3 py-3.5 text-right">Import Qty (kg)</th>
-                          <th className="px-3 py-3.5 text-right">Import Value</th>
-                          <th className="px-3 py-3.5">Input PCT</th>
-                          <th className="px-3 py-3.5">Analysis Certificate No.</th>
-                          <th className="px-3 py-3.5 text-right">Consumption As per IOCO (Net IOR)</th>
-                          <th className="px-3 py-3.5 text-right">Wastages</th>
-                          <th className="px-3 py-3.5 text-right">Total Consumption (Gross IOR)</th>
-                          <th className="px-3 py-3.5 text-right">%age of Wastage</th>
-                          <th className="px-3 py-3.5">Export GD No.</th>
-                          <th className="px-3 py-3.5">Export Description</th>
-                          <th className="px-3 py-3.5 text-right">Export Qty (Kg)</th>
-                          <th className="px-3 py-3.5 text-right">Export value (Rs.)</th>
-                          <th className="px-3 py-3.5 text-right">Consumption including wastage</th>
-                          <th className="px-3 py-3.5 text-right">Wastages (kg)</th>
-                          <th className="px-3 py-3.5 text-right">Closing Balance (Kg)</th>
-                          <th className="px-3 py-3.5 text-right">Value Addition</th>
-                          <th className="px-3 py-3.5 text-center no-print">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-800 text-slate-200 font-medium">
-                        {rows.map((rec: any, idx: number) => (
-                          <tr key={rec.id || idx} className="hover:bg-slate-900/40 transition">
-                            <td className="px-3 py-3.5 text-center font-mono text-slate-400">{idx + 1}</td>
-                            <td className="px-3 py-3.5 font-mono font-bold text-emerald-400">
-                              {idx === 0 ? (rec.importGdNo || importGdNo) : ''}
-                            </td>
-                            <td className="px-3 py-3.5 font-bold text-white">
-                              {idx === 0 ? (rec.importParticulars || rec.inputDescription || itemDesc) : ''}
-                            </td>
-                            <td className="px-3 py-3.5 text-right font-mono text-slate-100">
-                              {idx === 0 ? formatNumber(rec.importQty || rec.importQtyKg || 0, 0) : ''}
-                            </td>
-                            <td className="px-3 py-3.5 text-right font-mono text-slate-100">
-                              {idx === 0 ? formatNumber(rec.importValue || rec.importValuePkr || 0, 2) : ''}
-                            </td>
-                            <td className="px-3 py-3.5 font-mono text-slate-300">
-                              {idx === 0 ? (rec.importHsCode || rec.inputPct || 'N/A') : ''}
-                            </td>
-                            <td className="px-3 py-3.5 font-mono text-amber-300">
-                              {rec.analysisCertNo || 'N/A'}
-                            </td>
-                            <td className="px-3 py-3.5 text-right font-mono text-cyan-400">{formatNumber(rec.requirementQty || rec.netIocoConsumption || 0, 4)}</td>
-                            <td className="px-3 py-3.5 text-right font-mono text-amber-400">{formatNumber(rec.wastageQty || rec.iocoWastageQty || 0, 4)}</td>
-                            <td className="px-3 py-3.5 text-right font-mono font-bold text-blue-400">{formatNumber(rec.grossIocoConsumption || rec.inputWithWastage || 0, 4)}</td>
-                            <td className="px-3 py-3.5 text-right font-mono text-emerald-400">{formatNumber(rec.wastagePct || rec.wastagePercentage || 0, 2)}%</td>
-                            <td className="px-3 py-3.5 text-mono font-bold text-purple-400">{rec.exportGdNo || 'N/A'}</td>
-                            <td className="px-3 py-3.5 font-bold text-white">{rec.exportDescription || 'Export Item'}</td>
-                            <td className="px-3 py-3.5 text-right font-mono text-purple-300">{formatNumber(rec.resolvedExportQty, 0)}</td>
-                            <td className="px-3 py-3.5 text-right font-mono text-purple-200">{formatNumber(rec.exportValuePkr || 0, 2)}</td>
-                            <td className="px-3 py-3.5 text-right font-mono font-bold text-blue-400">{formatNumber(rec.resolvedTotalConsumed, 4)}</td>
-                            <td className="px-3 py-3.5 text-right font-mono font-bold text-amber-400">{formatNumber(rec.resolvedWastageQty, 4)}</td>
-                            <td className="px-3 py-3.5 text-right font-mono font-bold text-teal-400">{formatNumber(rec.computedClosingBalance, 4)}</td>
-                            <td className="px-3 py-3.5 text-right font-mono font-bold text-indigo-400">{formatNumber(rec.valueAddition || 0, 2)}%</td>
-                            <td className="px-3 py-3.5 text-center no-print">
-                              <div className="flex items-center justify-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenEditModal(rec)}
-                                  className="p-1.5 bg-blue-950/60 hover:bg-blue-900 text-blue-300 rounded-lg border border-blue-700/40 transition cursor-pointer"
-                                  title="Edit Entry"
-                                >
-                                  <Edit3 className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteRow(rec.id)}
-                                  className="p-1.5 bg-red-950/60 hover:bg-red-900 text-red-300 rounded-lg border border-red-700/40 transition cursor-pointer"
-                                  title="Delete Entry"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-
-                        {/* TOTAL ROW FOR CONSUMPTION & WASTAGES */}
-                        <tr className="bg-slate-900/90 font-black text-white border-t-2 border-slate-700">
-                          <td colSpan={15} className="px-3 py-3.5 text-right uppercase tracking-wider text-emerald-400">
-                            TOTAL:
-                          </td>
-                          <td className="px-3 py-3.5 text-right font-mono text-blue-400">
-                            {formatNumber(rows.reduce((sum, r) => sum + Number(r.resolvedTotalConsumed || 0), 0), 4)}
-                          </td>
-                          <td className="px-3 py-3.5 text-right font-mono text-amber-400">
-                            {formatNumber(rows.reduce((sum, r) => sum + Number(r.resolvedWastageQty || 0), 0), 4)}
-                          </td>
-                          <td colSpan={2} className="px-3 py-3.5"></td>
-                          <td className="px-3 py-3.5 text-center no-print"></td>
-                        </tr>
-                      </tbody>
-                    </table>
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full xl:w-auto justify-start xl:justify-end">
+                    <span className="text-xs sm:text-sm font-mono bg-slate-100 px-3.5 py-2 rounded-xl border border-slate-300 font-black text-slate-800">
+                      Entries: {rows.length}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleExportExcel(groupKey, rows, importGdNo, itemDesc)}
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow transition cursor-pointer"
+                    >
+                      <Download className="w-4 h-4" /> Excel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handlePrintStatement(groupKey)}
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow transition cursor-pointer"
+                    >
+                      <Printer className="w-4 h-4" /> Print
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleClearSingleGdStatement(groupKey, records)}
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow transition cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" /> Clear
+                    </button>
                   </div>
                 </div>
-              );
-            })
-          )}
-        </div>
-      )}
+
+                <div id={`statement-table-${groupKey}`} className="overflow-x-auto border-2 border-slate-300 rounded-2xl shadow-sm bg-white">
+                  <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
+                    <thead>
+                      <tr className="bg-slate-100 border-b border-slate-200">
+                        <th colSpan={20} className="py-4 px-4 text-center text-slate-900 font-black text-base sm:text-xl tracking-wider uppercase">
+                          RECONCILIATION STATEMENT M/s - {currentPartyNameText}
+                        </th>
+                      </tr>
+                      <tr className="bg-slate-100 border-b border-slate-200">
+                        <th colSpan={20} className="py-3 px-4 text-center text-slate-800 font-black text-sm sm:text-base tracking-wider uppercase">
+                          EFS Authorization Cert No.: {partyEfsCertNo}
+                        </th>
+                      </tr>
+
+                      <tr className="bg-slate-900 text-white font-black uppercase tracking-wider border-b border-slate-200 text-center text-[11px] sm:text-xs">
+                        <th></th>
+                        <th colSpan={5} className="bg-blue-900 text-blue-100 px-3 py-2.5 border-r border-slate-700">Input</th>
+                        <th colSpan={5} className="bg-slate-800 text-slate-200 px-3 py-2.5 border-r border-slate-700">IOR</th>
+                        <th colSpan={6} className="bg-blue-950 text-blue-100 px-3 py-2.5 border-r border-slate-700">Output</th>
+                        <th colSpan={2} className="bg-slate-800 text-slate-200 px-3 py-2.5 border-r border-slate-700">Balance &amp; Value</th>
+                        <th className="bg-slate-900 text-white px-3 py-2.5 no-print">ACTIONS</th>
+                      </tr>
+
+                      <tr className="bg-slate-100 text-slate-800 font-black uppercase text-[11px] sm:text-xs tracking-wider text-left border-b border-slate-200">
+                        <th className="px-3 py-3.5 text-center w-12">S. No.</th>
+                        <th className="px-3 py-3.5">Import GD No.</th>
+                        <th className="px-3 py-3.5">Input Description</th>
+                        <th className="px-3 py-3.5 text-right">Import Qty (kg)</th>
+                        <th className="px-3 py-3.5 text-right">Import Value</th>
+                        <th className="px-3 py-3.5">Input PCT</th>
+                        <th className="px-3 py-3.5">Analysis Certificate No.</th>
+                        <th className="px-3 py-3.5 text-right">Consumption As per IOCO (Net IOR)</th>
+                        <th className="px-3 py-3.5 text-right">Wastages</th>
+                        <th className="px-3 py-3.5 text-right">Total Consumption (Gross IOR)</th>
+                        <th className="px-3 py-3.5 text-right">%age of Wastage</th>
+                        <th className="px-3 py-3.5">Export GD No.</th>
+                        <th className="px-3 py-3.5">Export Description</th>
+                        <th className="px-3 py-3.5 text-right">Export Qty (Kg)</th>
+                        <th className="px-3 py-3.5 text-right">Export value (Rs.)</th>
+                        <th className="px-3 py-3.5 text-right">Consumption including wastage</th>
+                        <th className="px-3 py-3.5 text-right">Wastages (kg)</th>
+                        <th className="px-3 py-3.5 text-right">Closing Balance (Kg)</th>
+                        <th className="px-3 py-3.5 text-right">Value Addition</th>
+                        <th className="px-3 py-3.5 text-center no-print">ACTIONS</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 text-slate-900 font-medium">
+                      {rows.map((rec: any, idx: number) => (
+                        <tr key={rec.id || idx} className="hover:bg-slate-50 transition">
+                          <td className="px-3 py-3.5 text-center font-bold text-slate-700">{idx + 1}</td>
+                          <td className="px-3 py-3.5 font-mono font-black text-blue-700">
+                            {idx === 0 ? (rec.importGdNo || importGdNo) : ''}
+                          </td>
+                          <td className="px-3 py-3.5 font-black text-slate-900">
+                            {idx === 0 ? (rec.importParticulars || rec.inputDescription || itemDesc) : ''}
+                          </td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">
+                            {idx === 0 ? formatNumber(rec.importQty || rec.importQtyKg || 0, 0) : ''}
+                          </td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">
+                            {idx === 0 ? formatNumber(rec.importValue || rec.importValuePkr || 0, 2) : ''}
+                          </td>
+                          <td className="px-3 py-3.5 font-mono font-black text-slate-800">
+                            {idx === 0 ? (rec.importHsCode || rec.inputPct || 'N/A') : ''}
+                          </td>
+                          <td className="px-3 py-3.5 font-mono font-black text-slate-800">
+                            {rec.analysisCertNo || 'N/A'}
+                          </td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-blue-700">{formatNumber(rec.requirementQty || rec.netIocoConsumption || 0, 4)}</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-700">{formatNumber(rec.wastageQty || rec.iocoWastageQty || 0, 4)}</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.grossIocoConsumption || rec.inputWithWastage || 0, 4)}</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-emerald-700">{formatNumber(rec.wastagePct || rec.wastagePercentage || 0, 2)}%</td>
+                          <td className="px-3 py-3.5 font-mono font-black text-blue-700">{rec.exportGdNo || 'N/A'}</td>
+                          <td className="px-3 py-3.5 font-black text-slate-900">{rec.exportDescription || 'Export Item'}</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.resolvedExportQty, 0)}</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.exportValuePkr || 0, 2)}</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-blue-700">{formatNumber(rec.resolvedTotalConsumed, 4)}</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-700">{formatNumber(rec.resolvedWastageQty, 4)}</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-emerald-700">{formatNumber(rec.computedClosingBalance, 4)}</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.valueAddition || 0, 2)}%</td>
+                          <td className="px-3 py-3.5 text-center no-print">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditModal(rec)}
+                                className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl border border-blue-300 transition cursor-pointer shadow-sm"
+                                title="Edit Entry"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteRow(rec.id)}
+                                className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl border border-red-300 transition cursor-pointer shadow-sm"
+                                title="Delete Entry"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+
+                      {/* TOTAL ROW FOR CONSUMPTION & WASTAGES */}
+                      <tr className="bg-slate-900 font-black text-white border-t-4 border-slate-900">
+                        <td colSpan={15} className="px-4 py-4 text-right uppercase tracking-wider text-white text-xs sm:text-sm">
+                          TOTAL:
+                        </td>
+                        <td className="px-4 py-4 text-right font-mono text-cyan-400 text-xs sm:text-sm">
+                          {formatNumber(rows.reduce((sum, r) => sum + Number(r.resolvedTotalConsumed || 0), 4), 4)}
+                        </td>
+                        <td className="px-4 py-4 text-right font-mono text-amber-400 text-xs sm:text-sm">
+                          {formatNumber(rows.reduce((sum, r) => sum + Number(r.resolvedWastageQty || 0), 4), 4)}
+                        </td>
+                        <td colSpan={2} className="px-4 py-4"></td>
+                        <td className="px-4 py-4 text-center no-print"></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
 
       {/* EDIT MODAL FOR MANUAL VALUES */}
       {editingItem && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-lg w-full space-y-4 shadow-2xl">
-            <h3 className="text-lg font-black text-white">Edit Reconciliation Item (Manual Values)</h3>
-            <div className="space-y-3 text-xs">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-3xl p-6 sm:p-8 max-w-lg w-full space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl sm:text-2xl font-black text-slate-900">Edit Reconciliation Item (Manual Values)</h3>
+            <div className="space-y-4 text-xs sm:text-sm">
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Export Qty (KG)</label>
+                <label className="block text-slate-800 font-black uppercase tracking-wider mb-2">Export Qty (KG)</label>
                 <input 
                   type="number" 
                   value={editExportQty} 
-                  onChange={e => setEditExportQty(e.target.value)} 
-                  className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-cyan-500 font-mono" 
+                  onChange={handleExportQtyChange} 
+                  className="w-full p-3.5 sm:p-4 bg-slate-50 border-2 border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 font-mono font-bold text-sm sm:text-base transition-colors" 
                 />
               </div>
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Export Value (Rs.)</label>
+                <label className="block text-slate-800 font-black uppercase tracking-wider mb-2">Export Value (Rs.)</label>
                 <input 
                   type="number" 
                   value={editExportValue} 
                   onChange={e => setEditExportValue(e.target.value)} 
-                  className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-cyan-500 font-mono" 
+                  className="w-full p-3.5 sm:p-4 bg-slate-50 border-2 border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 font-mono font-bold text-sm sm:text-base transition-colors" 
                 />
               </div>
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Consumption including Wastage</label>
+                <label className="block text-slate-800 font-black uppercase tracking-wider mb-2">Consumption including Wastage</label>
                 <input 
                   type="number" 
                   value={editConsumptionIncWastage} 
                   onChange={e => setEditConsumptionIncWastage(e.target.value)} 
-                  className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-cyan-500 font-mono" 
+                  className="w-full p-3.5 sm:p-4 bg-slate-50 border-2 border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 font-mono font-bold text-sm sm:text-base transition-colors" 
                 />
               </div>
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Wastages (KG)</label>
+                <label className="block text-slate-800 font-black uppercase tracking-wider mb-2">Wastages (KG)</label>
                 <input 
                   type="number" 
                   value={editWastagesKg} 
                   onChange={e => setEditWastagesKg(e.target.value)} 
-                  className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-cyan-500 font-mono" 
+                  className="w-full p-3.5 sm:p-4 bg-slate-50 border-2 border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 font-mono font-bold text-sm sm:text-base transition-colors" 
                 />
               </div>
             </div>
-            <div className="flex justify-end gap-3 mt-4 pt-2 border-t border-slate-800">
+            <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6 pt-4 border-t border-slate-200">
               <button 
                 type="button"
                 onClick={() => setEditingItem(null)} 
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition"
+                className="w-full sm:w-auto px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs sm:text-sm font-black uppercase tracking-wider transition cursor-pointer border border-slate-300"
               >
                 Cancel
               </button>
@@ -1453,14 +1604,19 @@ export default function InputOutputDetailsPage() {
                 type="button"
                 onClick={handleUpdateRow} 
                 disabled={isUpdating} 
-                className="px-5 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg transition"
+                className="w-full sm:w-auto px-7 py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl transition cursor-pointer"
               >
-                {isUpdating && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Save Changes
+                {isUpdating && <Loader2 className="w-5 h-5 animate-spin" />} Save Changes
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Footer */}
+      <footer className="bg-gradient-to-r from-blue-700 via-blue-900 to-slate-950 text-blue-200 text-center py-4 sm:py-5 text-xs sm:text-sm font-bold border-t border-blue-900 w-full shadow-inner rounded-2xl mt-12">
+        &copy; 2026 Customs Clearing ERP &bull; Powered by EFS Advanced Compliance Engine. All rights reserved.
+      </footer>
     </div>
   );
 }

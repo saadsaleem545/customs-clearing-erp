@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Shaheen Customs Clearing & Freight Forwarding ERP',
+  title: 'HASH Customs Clearing & Freight Forwarding ERP',
   description: 'Production-ready ERP system for Pakistan Customs WeBOC & IOCO reconciliation',
 };
 

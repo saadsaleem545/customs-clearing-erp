@@ -15,7 +15,14 @@ import {
   CheckCircle2,
   PackageCheck,
   FileCheck2,
-  Scale
+  Scale,
+  LogOut,
+  UserCheck,
+  X,
+  Camera,
+  KeyRound,
+  User as UserIcon,
+  Check
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -29,7 +36,31 @@ export default function ExecutiveDashboardPage() {
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Fetch live stats from API endpoints including Analysis Certificates
+  // User Profile State
+  const [userName, setUserName] = useState("Saad Saleem");
+  const [userRole, setUserRole] = useState("SUPER ADMIN");
+  const [profilePic, setProfilePic] = useState<string | null>(null);
+  
+  // Edit Profile Modal State
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+  const [newUsername, setNewUsername] = useState(userName);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [profileMessage, setProfileMessage] = useState({ type: '', text: '' });
+  const [isSaving, setIsSaving] = useState(false);
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+      .substring(0, 2);
+  };
+
+  const initials = getInitials(userName);
+
+  // Fetch live stats from API endpoints
   const fetchDashboardStats = async () => {
     try {
       setIsRefreshing(true);
@@ -63,235 +94,451 @@ export default function ExecutiveDashboardPage() {
     fetchDashboardStats();
   }, []);
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfilePic(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleUpdateProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    setProfileMessage({ type: '', text: '' });
+
+    setTimeout(() => {
+      if (newUsername.trim()) {
+        setUserName(newUsername);
+      }
+      setIsSaving(false);
+      setProfileMessage({ type: 'success', text: 'Profile updated successfully!' });
+      setTimeout(() => {
+        setIsEditProfileOpen(false);
+        setProfileMessage({ type: '', text: '' });
+      }, 1500);
+    }, 800);
+  };
+
   return (
-    <div className="space-y-8 max-w-[1700px] mx-auto font-sans p-6 text-slate-100">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col justify-between relative">
       <style jsx global>{`
         ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #020617; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
-        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
       `}</style>
 
-      {/* Top Command Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-8 shadow-2xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative overflow-hidden">
-        <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none"></div>
+      {/* Top Full Width Header with User Profile Box (Clickable to Edit) & Sync Hub */}
+      <header className="bg-gradient-to-r from-blue-700 via-blue-900 to-slate-950 text-white shadow-xl border-b border-blue-900 w-full">
+        <div className="w-full px-8 py-4 flex flex-col lg:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <span className="text-3xl font-black tracking-wider text-white">
+              HASH <span className="text-xs font-mono uppercase bg-blue-600 text-white px-2.5 py-1 rounded shadow-sm">ERP</span>
+            </span>
+            <span className="text-xs font-semibold text-blue-200 border-l border-blue-600/50 pl-4 hidden sm:inline">
+              Enterprise Environment / Pakistan Customs Clearance Hub
+            </span>
+          </div>
+
+          <div className="flex items-center gap-4 flex-wrap">
+            <button
+              onClick={fetchDashboardStats}
+              disabled={isRefreshing}
+              className="px-4 py-2 bg-blue-900/80 hover:bg-blue-800 text-blue-100 font-bold text-xs rounded-xl transition border border-blue-600/40 flex items-center gap-2 shadow cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${isRefreshing ? 'animate-spin' : ''}`} /> Sync Hub
+            </button>
+
+            {/* Clickable User Profile Box inside Header */}
+            <div 
+              onClick={() => {
+                setNewUsername(userName);
+                setIsEditProfileOpen(true);
+              }}
+              className="px-4 py-2 bg-blue-950/70 hover:bg-blue-900/90 border border-blue-600/40 rounded-2xl flex items-center gap-4 shadow-inner cursor-pointer transition group"
+              title="Click to Edit Profile"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-700 text-white font-bold text-xs flex items-center justify-center ring-2 ring-blue-600 shrink-0 shadow overflow-hidden relative">
+                  {profilePic ? (
+                    <img src={profilePic} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    initials
+                  )}
+                </div>
+                <div className="text-left">
+                  <span className="font-black text-white group-hover:text-cyan-200 transition block text-xs tracking-tight flex items-center gap-1.5">
+                    {userName} <UserCheck className="w-3 h-3 text-cyan-400 opacity-0 group-hover:opacity-100 transition" />
+                  </span>
+                  <span className="text-[10px] font-extrabold text-blue-300 font-mono tracking-wider">{userRole}</span>
+                </div>
+              </div>
+
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  await fetch('/api/v1/auth/logout', { method: 'POST' });
+                  window.location.href = '/';
+                }}
+                className="p-2 rounded-xl bg-red-950/60 text-red-300 hover:bg-red-900 hover:text-white transition border border-red-800/50 cursor-pointer shrink-0 shadow"
+                title="Secure Logout"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Container */}
+      <main className="w-full px-6 py-12 flex-grow max-w-[1700px] mx-auto space-y-8">
         
-        <div className="space-y-2 relative z-10">
-          <h1 className="text-3xl lg:text-4xl font-black text-white tracking-tight">HASH Logistics Command Dashboard</h1>
-          <p className="text-sm text-slate-400 max-w-2xl leading-relaxed">
-            Real-time monitoring of WebOC Customs Goods Declarations, IOCO Input-Output Reconciliation, stock balances, and financial ledgers.
-          </p>
+        {/* Command Banner */}
+        <div className="bg-white border-4 border-slate-900 rounded-2xl p-8 shadow-2xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative overflow-hidden">
+          <div className="space-y-2 relative z-10">
+            <h1 className="text-3xl lg:text-4xl font-black text-slate-900 tracking-tight">HASH Logistics Command Dashboard</h1>
+            <p className="text-sm text-slate-600 max-w-2xl leading-relaxed font-medium">
+              Real-time monitoring of WebOC Customs Goods Declarations, IOCO Input-Output Reconciliation, stock balances, and financial ledgers.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 relative z-10">
+            <Link
+              href="/dashboard/imports"
+              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md flex items-center gap-1.5 transition"
+            >
+              <PlusCircle className="w-4 h-4" /> Register Import GD
+            </Link>
+
+            <Link
+              href="/dashboard/exports"
+              className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md flex items-center gap-1.5 transition"
+            >
+              <PlusCircle className="w-4 h-4" /> Register Export GD
+            </Link>
+
+            <Link
+              href="/dashboard/analysis"
+              className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md flex items-center gap-1.5 transition"
+            >
+              <PlusCircle className="w-4 h-4" /> Register Analysis Certificate
+            </Link>
+
+            <Link
+              href="/dashboard/reconciliation"
+              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md flex items-center gap-1.5 transition"
+            >
+              <Zap className="w-4 h-4" /> Run IOR Engine
+            </Link>
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 relative z-10">
-          <button
-            onClick={fetchDashboardStats}
-            disabled={isRefreshing}
-            className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-2xl transition border border-slate-700/80 flex items-center gap-2 shadow-lg cursor-pointer"
-            title="Refresh Command Matrix"
-          >
-            <RefreshCw className={`w-4 h-4 text-emerald-400 ${isRefreshing ? 'animate-spin' : ''}`} /> Sync Hub
-          </button>
-          
-          <Link
+        {/* Top Metrics Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+          {/* Card 1 */}
+          <div className="bg-white border-2 border-slate-300 hover:border-blue-600 rounded-2xl p-7 shadow-xl transition space-y-4 group">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-black uppercase tracking-wider text-slate-600">Active Clients</span>
+              <div className="p-3 bg-blue-50 text-blue-600 rounded-xl border border-blue-200">
+                <Users className="w-6 h-6" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <div className="text-5xl font-black text-slate-900 font-mono">{stats.activeClients}</div>
+              <p className="text-xs font-bold text-emerald-600 flex items-center gap-1">
+                <CheckCircle2 className="w-4 h-4 shrink-0" /> +100% Active Verified Importers/Exporters
+              </p>
+            </div>
+          </div>
+
+          {/* Card 2 */}
+          <div className="bg-white border-2 border-slate-300 hover:border-emerald-600 rounded-2xl p-7 shadow-xl transition space-y-4 group">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-black uppercase tracking-wider text-slate-600">Import GDs Cleared</span>
+              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-200">
+                <FileSpreadsheet className="w-6 h-6" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <div className="text-5xl font-black text-slate-900 font-mono">{stats.importGds}</div>
+              <p className="text-xs font-bold text-slate-700">Bills of Entry Registered &amp; Assessed</p>
+            </div>
+          </div>
+
+          {/* Card 3 */}
+          <div className="bg-white border-2 border-slate-300 hover:border-purple-600 rounded-2xl p-7 shadow-xl transition space-y-4 group">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-black uppercase tracking-wider text-slate-600">Export Shipping Bills</span>
+              <div className="p-3 bg-purple-50 text-purple-600 rounded-xl border border-purple-200">
+                <FileText className="w-6 h-6" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <div className="text-5xl font-black text-slate-900 font-mono">{stats.exportBills}</div>
+              <p className="text-xs font-bold text-slate-700">Form-E Filings Verified &amp; Cleared</p>
+            </div>
+          </div>
+
+          {/* Card 4 */}
+          <div className="bg-white border-2 border-slate-300 hover:border-amber-600 rounded-2xl p-7 shadow-xl transition space-y-4 group">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-black uppercase tracking-wider text-slate-600">Total Analysis Certificates</span>
+              <div className="p-3 bg-amber-50 text-amber-600 rounded-xl border border-amber-200">
+                <FileText className="w-6 h-6" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <div className="text-5xl font-black text-slate-900 font-mono tracking-tight">
+                {stats.totalAnalysisCerts}
+              </div>
+              <p className="text-xs font-bold text-slate-700">Verified IOCO Certificates Issued</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Lower Engines Section */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* 1. Raw Material Stock Engine */}
+          <Link 
             href="/dashboard/imports"
-            className="px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-xl border border-emerald-500/40 flex items-center gap-2 transition"
+            className="bg-white border-2 border-slate-300 hover:border-emerald-600 rounded-2xl p-7 shadow-xl flex flex-col justify-between transition cursor-pointer group"
           >
-            <PlusCircle className="w-4 h-4" /> Register Import GD
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-200">
+                    <Database className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-slate-900">Raw Material Stock</h3>
+                    <p className="text-xs text-slate-500 font-bold">FIFO Input Tracking</p>
+                  </div>
+                </div>
+                <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-200">
+                  View <ArrowUpRight className="w-3.5 h-3.5 inline" />
+                </span>
+              </div>
+              <p className="text-sm text-slate-700 font-medium leading-relaxed">
+                Real-time inventory levels, FIFO tracking, and registered raw input ledgers.
+              </p>
+            </div>
           </Link>
 
-          <Link
+          {/* 2. Export Shipping Bills Engine */}
+          <Link 
             href="/dashboard/exports"
-            className="px-5 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-xl border border-purple-500/40 flex items-center gap-2 transition"
+            className="bg-white border-2 border-slate-300 hover:border-purple-600 rounded-2xl p-7 shadow-xl flex flex-col justify-between transition cursor-pointer group"
           >
-            <PlusCircle className="w-4 h-4" /> Register Export GD
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-purple-50 text-purple-600 rounded-xl border border-purple-200">
+                    <PackageCheck className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-slate-900">Export Shipping Bills</h3>
+                    <p className="text-xs text-slate-500 font-bold">Customs Export GDs</p>
+                  </div>
+                </div>
+                <span className="text-xs font-black text-purple-700 bg-purple-50 px-3 py-1 rounded-lg border border-purple-200">
+                  View <ArrowUpRight className="w-3.5 h-3.5 inline" />
+                </span>
+              </div>
+              <p className="text-sm text-slate-700 font-medium leading-relaxed">
+                Track processed customs export declarations, Form-E clearances, and shipments.
+              </p>
+            </div>
           </Link>
 
-          <Link
+          {/* 3. Analysis Certificate Manager */}
+          <Link 
             href="/dashboard/analysis"
-            className="px-5 py-3 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-xl border border-amber-500/40 flex items-center gap-2 transition"
+            className="bg-white border-2 border-slate-300 hover:border-amber-600 rounded-2xl p-7 shadow-xl flex flex-col justify-between transition cursor-pointer group"
           >
-            <PlusCircle className="w-4 h-4" /> Register Analysis Certificate
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-amber-50 text-amber-600 rounded-xl border border-amber-200">
+                    <FileCheck2 className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-slate-900">Analysis Certificates</h3>
+                    <p className="text-xs text-slate-500 font-bold">IOCO &amp; Wastage Matrix</p>
+                  </div>
+                </div>
+                <span className="text-xs font-black text-amber-700 bg-amber-50 px-3 py-1 rounded-lg border border-amber-200">
+                  View <ArrowUpRight className="w-3.5 h-3.5 inline" />
+                </span>
+              </div>
+              <p className="text-sm text-slate-700 font-medium leading-relaxed">
+                Manage issued IOCO certificates, wastage allowances, and approved ratios.
+              </p>
+            </div>
           </Link>
 
-          <Link
+          {/* 4. IOR Audit Engine */}
+          <Link 
             href="/dashboard/reconciliation"
-            className="px-5 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-xl border border-blue-500/40 flex items-center gap-2 transition"
+            className="bg-white border-2 border-slate-300 hover:border-blue-600 rounded-2xl p-7 shadow-xl flex flex-col justify-between transition cursor-pointer group"
           >
-            <Zap className="w-4 h-4" /> Run IOR Engine
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-blue-50 text-blue-600 rounded-xl border border-blue-200">
+                    <Scale className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-slate-900">IOR Audit Engine</h3>
+                    <p className="text-xs text-slate-500 font-bold">Input-Output Reconciliation</p>
+                  </div>
+                </div>
+                <span className="text-xs font-black text-blue-700 bg-blue-50 px-3 py-1 rounded-lg border border-blue-200">
+                  Open <ArrowUpRight className="w-3.5 h-3.5 inline" />
+                </span>
+              </div>
+              <p className="text-sm text-slate-700 font-medium leading-relaxed">
+                Run comprehensive input-output reconciliations, audits, and compliance ledgers.
+              </p>
+            </div>
           </Link>
         </div>
-      </div>
 
-      {/* Top Metrics Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-        {/* Card 1: Active Clients */}
-        <div className="bg-slate-900/90 border border-slate-800 hover:border-slate-700 rounded-3xl p-6 shadow-xl transition space-y-4 relative group">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Active Clients</span>
-            <div className="p-3 bg-blue-500/10 text-blue-400 rounded-2xl border border-blue-500/20 group-hover:scale-110 transition">
-              <Users className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <div className="text-4xl font-black text-white font-mono">{stats.activeClients}</div>
-            <p className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> +100% Active Verified Importers/Exporters
-            </p>
-          </div>
-        </div>
+      </main>
 
-        {/* Card 2: Import GDs Cleared */}
-        <div className="bg-slate-900/90 border border-slate-800 hover:border-slate-700 rounded-3xl p-6 shadow-xl transition space-y-4 relative group">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Import GDs Cleared</span>
-            <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-2xl border border-emerald-500/20 group-hover:scale-110 transition">
-              <FileSpreadsheet className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <div className="text-4xl font-black text-white font-mono">{stats.importGds}</div>
-            <p className="text-[11px] font-semibold text-slate-400">Bills of Entry Registered &amp; Assessed</p>
-          </div>
-        </div>
+      {/* Footer with Gradient Background */}
+      <footer className="bg-gradient-to-r from-blue-700 via-blue-900 to-slate-950 text-blue-200 text-center py-4 text-xs border-t border-blue-900 w-full shadow-inner">
+        &copy; 2026 Customs Clearing ERP &bull; Powered by EFS Advanced Compliance Engine. All rights reserved.
+      </footer>
 
-        {/* Card 3: Export Shipping Bills */}
-        <div className="bg-slate-900/90 border border-slate-800 hover:border-slate-700 rounded-3xl p-6 shadow-xl transition space-y-4 relative group">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Export Shipping Bills</span>
-            <div className="p-3 bg-purple-500/10 text-purple-400 rounded-2xl border border-purple-500/20 group-hover:scale-110 transition">
-              <FileText className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <div className="text-4xl font-black text-white font-mono">{stats.exportBills}</div>
-            <p className="text-[11px] font-semibold text-slate-400">Form-E Filings Verified &amp; Cleared</p>
-          </div>
-        </div>
-
-        {/* Card 4: Total Analysis Certificates */}
-        <div className="bg-slate-900/90 border border-slate-800 hover:border-slate-700 rounded-3xl p-6 shadow-xl transition space-y-4 relative group">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Analysis Certificates</span>
-            <div className="p-3 bg-amber-500/10 text-amber-400 rounded-2xl border border-amber-500/20 group-hover:scale-110 transition">
-              <FileText className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <div className="text-4xl font-black text-white font-mono tracking-tight">
-              {stats.totalAnalysisCerts}
-            </div>
-            <p className="text-[11px] font-semibold text-slate-400">Verified IOCO Certificates Issued</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Lower Engines Section (4 Cards Grid Layout) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* 1. Raw Material Stock Engine */}
-        <Link 
-          href="/dashboard/imports"
-          className="bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-3xl p-6 shadow-2xl flex flex-col justify-between transition cursor-pointer group"
-        >
-          <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+      {/* Edit Profile Modal */}
+      {isEditProfileOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border-4 border-slate-900 rounded-3xl max-w-lg w-full p-8 shadow-2xl space-y-6 relative animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-4">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-emerald-500/10 text-emerald-400 rounded-2xl border border-emerald-500/20 group-hover:scale-110 transition">
-                  <Database className="w-5 h-5" />
+                <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl border border-blue-200">
+                  <UserCheck className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-white">Raw Material Stock</h3>
-                  <p className="text-[10px] text-slate-400">FIFO Input Tracking</p>
+                  <h3 className="text-xl font-black text-slate-900">Edit Administrator Profile</h3>
+                  <p className="text-xs text-slate-500 font-bold">Update profile picture, username &amp; security credentials</p>
                 </div>
               </div>
-              <span className="text-[10px] font-bold text-emerald-400 group-hover:text-emerald-300 flex items-center gap-0.5 bg-emerald-950/50 px-2.5 py-1 rounded-xl border border-emerald-700/30 transition">
-                View <ArrowUpRight className="w-3 h-3" />
-              </span>
+              <button
+                onClick={() => setIsEditProfileOpen(false)}
+                className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Real-time inventory levels, FIFO tracking, and registered raw input ledgers.
-            </p>
-          </div>
-        </Link>
 
-        {/* 2. Export Shipping Bills Engine */}
-        <Link 
-          href="/dashboard/exports"
-          className="bg-slate-900 border border-slate-800 hover:border-purple-500/50 rounded-3xl p-6 shadow-2xl flex flex-col justify-between transition cursor-pointer group"
-        >
-          <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-purple-500/10 text-purple-400 rounded-2xl border border-purple-500/20 group-hover:scale-110 transition">
-                  <PackageCheck className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-white">Export Shipping Bills</h3>
-                  <p className="text-[10px] text-slate-400">Customs Export GDs</p>
-                </div>
+            {profileMessage.text && (
+              <div className={`p-4 rounded-2xl text-xs font-bold flex items-center gap-2 ${
+                profileMessage.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'
+              }`}>
+                <Check className="w-4 h-4" /> {profileMessage.text}
               </div>
-              <span className="text-[10px] font-bold text-purple-400 group-hover:text-purple-300 flex items-center gap-0.5 bg-purple-950/50 px-2.5 py-1 rounded-xl border border-purple-700/30 transition">
-                View <ArrowUpRight className="w-3 h-3" />
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Track processed customs export declarations, Form-E clearances, and shipments.
-            </p>
-          </div>
-        </Link>
+            )}
 
-        {/* 3. Analysis Certificate Manager */}
-        <Link 
-          href="/dashboard/analysis"
-          className="bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-3xl p-6 shadow-2xl flex flex-col justify-between transition cursor-pointer group"
-        >
-          <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-2xl border border-amber-500/20 group-hover:scale-110 transition">
-                  <FileCheck2 className="w-5 h-5" />
+            <form onSubmit={handleUpdateProfile} className="space-y-5">
+              {/* Profile Picture Upload */}
+              <div className="flex items-center gap-5">
+                <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-blue-700 to-indigo-600 text-white font-black text-2xl flex items-center justify-center ring-4 ring-slate-100 shadow-xl overflow-hidden relative group">
+                  {profilePic ? (
+                    <img src={profilePic} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    initials
+                  )}
+                  <label className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center text-white cursor-pointer text-[10px] font-bold">
+                    <Camera className="w-5 h-5 mb-0.5" /> Upload
+                    <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                  </label>
                 </div>
-                <div>
-                  <h3 className="text-sm font-black text-white">Analysis Certificates</h3>
-                  <p className="text-[10px] text-slate-400">IOCO &amp; Wastage Matrix</p>
+                <div className="space-y-1">
+                  <h4 className="text-sm font-black text-slate-900">Profile Picture</h4>
+                  <p className="text-xs text-slate-500 font-medium">Click on avatar to browse and upload a new photo (PNG, JPG).</p>
                 </div>
               </div>
-              <span className="text-[10px] font-bold text-amber-400 group-hover:text-amber-300 flex items-center gap-0.5 bg-amber-950/50 px-2.5 py-1 rounded-xl border border-amber-700/30 transition">
-                View <ArrowUpRight className="w-3 h-3" />
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Manage issued IOCO certificates, wastage allowances, and approved ratios.
-            </p>
-          </div>
-        </Link>
 
-        {/* 4. IOR Audit Engine */}
-        <Link 
-          href="/dashboard/reconciliation"
-          className="bg-slate-900 border border-slate-800 hover:border-blue-500/50 rounded-3xl p-6 shadow-2xl flex flex-col justify-between transition cursor-pointer group"
-        >
-          <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-blue-500/10 text-blue-400 rounded-2xl border border-blue-500/20 group-hover:scale-110 transition">
-                  <Scale className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-white">IOR Audit Engine</h3>
-                  <p className="text-[10px] text-slate-400">Input-Output Reconciliation</p>
+              {/* Username Input */}
+              <div className="space-y-2">
+                <label className="text-xs font-black uppercase tracking-wider text-slate-700">Username / Full Name</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                    <UserIcon className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={newUsername}
+                    onChange={(e) => setNewUsername(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3 bg-slate-50 border-2 border-slate-200 focus:border-blue-600 focus:bg-white rounded-xl text-sm font-bold text-slate-900 outline-none transition"
+                  />
                 </div>
               </div>
-              <span className="text-[10px] font-bold text-blue-400 group-hover:text-blue-300 flex items-center gap-0.5 bg-blue-950/50 px-2.5 py-1 rounded-xl border border-blue-700/30 transition">
-                Open <ArrowUpRight className="w-3 h-3" />
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Run comprehensive input-output reconciliations, audits, and compliance ledgers.
-            </p>
+
+              {/* Change Password Section */}
+              <div className="space-y-4 pt-2 border-t border-slate-200">
+                <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Change Password (Optional)</h4>
+                
+                <div className="space-y-2">
+                  <label className="text-xs font-black uppercase tracking-wider text-slate-700">Current Password</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                      <KeyRound className="w-4 h-4" />
+                    </div>
+                    <input
+                      type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      placeholder="••••••••••••"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border-2 border-slate-200 focus:border-blue-600 focus:bg-white rounded-xl text-sm font-bold text-slate-900 outline-none transition"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-black uppercase tracking-wider text-slate-700">New Password</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                      <KeyRound className="w-4 h-4" />
+                    </div>
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="••••••••••••"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border-2 border-slate-200 focus:border-blue-600 focus:bg-white rounded-xl text-sm font-bold text-slate-900 outline-none transition"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setIsEditProfileOpen(false)}
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider rounded-xl transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-blue-600/30 transition cursor-pointer flex items-center gap-2"
+                >
+                  {isSaving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
           </div>
-        </Link>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

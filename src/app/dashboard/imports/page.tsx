@@ -5,30 +5,28 @@ import ImportGdForm from '@/components/ImportGdForm';
 
 export default function ImportsPage() {
   return (
-    <div className="p-6 text-slate-100 min-h-screen max-w-[1700px] mx-auto font-sans">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col justify-between p-6 space-y-8 max-w-[1700px] mx-auto">
       {/* Custom Sleek Scrollbars Styling */}
-      <style dangerouslySetInnerHTML={{
-        __html: `
-          ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-          }
-          ::-webkit-scrollbar-track {
-            background: #020617;
-          }
-          ::-webkit-scrollbar-thumb {
-            background: #334155;
-            border-radius: 9999px;
-          }
-          ::-webkit-scrollbar-thumb:hover {
-            background: #64748b;
-          }
-        `
-      }} />
+      <style jsx global>{`
+        ::-webkit-scrollbar {
+          width: 6px;
+          height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+          background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+          background: #cbd5e1;
+          border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+          background: #94a3b8;
+        }
+      `}</style>
 
-      <div className="mb-6">
-        <h1 className="text-3xl font-black text-white">Imports Management</h1>
-        <p className="text-xs text-slate-400 mt-1">
+      <div className="space-y-2">
+        <h1 className="text-3xl font-black text-blue-600 tracking-tight">Imports Management</h1>
+        <p className="text-base text-slate-900 font-bold">
           Manage your import GD records, auto-excel uploads, and manual entries seamlessly.
         </p>
       </div>
@@ -36,4 +34,4 @@ export default function ImportsPage() {
       <ImportGdForm />
     </div>
   );
-} 
+}

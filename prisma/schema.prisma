@@ -244,22 +244,22 @@ model ExportGd {
 }
 
 model ExportGdItem {
-  id                String   @id @default(uuid())
-  exportGdId        String
-  serialNo          Int      @default(1)
-  exportHsCode      String
+  id              String   @id @default(uuid())
+  exportGdId      String
+  serialNo        Int      @default(1)
+  exportHsCode    String
   exportParticulars String
-  qtyOfExports      Decimal  @db.Decimal(12, 4)
-  valueOfeExports   Decimal  @db.Decimal(12, 4)
-  importHsCode      String
-  inputValue        Decimal  @db.Decimal(12, 4)
-  wastageValue      Decimal  @db.Decimal(12, 4)
-  consumedQty       Decimal  @db.Decimal(12, 4)
-  wastageQty        Decimal  @db.Decimal(12, 4)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  qtyOfExports    Decimal  @db.Decimal(12, 4)
+  valueOfeExports Decimal  @db.Decimal(12, 4)
+  importHsCode    String
+  inputValue      Decimal  @db.Decimal(12, 4)
+  wastageValue    Decimal  @db.Decimal(12, 4)
+  consumedQty     Decimal  @db.Decimal(12, 4)
+  wastageQty      Decimal  @db.Decimal(12, 4)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  exportGd          ExportGd @relation(fields: [exportGdId], references: [id], onDelete: Cascade)
+  exportGd        ExportGd @relation(fields: [exportGdId], references: [id], onDelete: Cascade)
 
   @@map("export_gd_items")
 }
@@ -286,8 +286,8 @@ model InputMaterial {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  party              Party                 @relation(fields: [partyId], references: [id], onDelete: Cascade)
-  importGdItem       ImportGdItem          @relation(fields: [importGdItemId], references: [id], onDelete: Cascade)
+  party              Party               @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  importGdItem       ImportGdItem        @relation(fields: [importGdItemId], references: [id], onDelete: Cascade)
   materialLedgers    MaterialTransaction[]
   reconciliations    ReconciliationItem[]
 
@@ -363,9 +363,9 @@ model ReconciliationItem {
   actualWastageKg       Decimal              @default(0.000) @db.Decimal(12, 3)
   closingBalanceKg      Decimal              @default(0.000) @db.Decimal(12, 3)
   valueAddition         Decimal              @default(0.00) @db.Decimal(10, 2)
-  unitClaim             Decimal              @db.Decimal(12, 4)
-  calculatedDifference  Decimal              @db.Decimal(12, 3)
-  itemStatus            ReconciliationStatus
+  unitClaim             Decimal?             @db.Decimal(12, 4)
+  calculatedDifference  Decimal?             @db.Decimal(12, 3)
+  itemStatus            ReconciliationStatus @default(PENDING)
 
   reconciliation        Reconciliation       @relation(fields: [reconciliationId], references: [id], onDelete: Cascade)
   inputMaterial         InputMaterial        @relation(fields: [inputMaterialId], references: [id], onDelete: Cascade)
