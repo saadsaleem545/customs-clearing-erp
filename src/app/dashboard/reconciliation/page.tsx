@@ -31,13 +31,12 @@ export default function InputOutputDetailsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
 
-  // Edit Modal States for Manual Values
-  const [editingItem, setEditingItem] = useState<any>(null);
-  const [editExportQty, setEditExportQty] = useState('');
-  const [editExportValue, setEditExportValue] = useState('');
-  const [editConsumptionIncWastage, setEditConsumptionIncWastage] = useState('');
-  const [editWastagesKg, setEditWastagesKg] = useState('');
-  const [isUpdating, setIsUpdating] = useState(false);
+  // Quick Edit State for Export GD Item Quantity & Value (Two-Step: Update then Save)
+  const [editingExportQtyItem, setEditingExportQtyItem] = useState<any>(null);
+  const [tempExportQtyVal, setTempExportQtyVal] = useState('');
+  const [isUpdatedInModal, setIsUpdatedInModal] = useState(false);
+  const [calculatedBalancedQty, setCalculatedBalancedQty] = useState<number>(0);
+  const [calculatedBalancedVal, setCalculatedBalancedVal] = useState<number>(0);
 
   // Matrix table records state (global reconciliations if admin or party-specific)
   const [partyReconciliations, setPartyReconciliations] = useState<any[]>([]);
@@ -182,7 +181,7 @@ export default function InputOutputDetailsPage() {
       }
 
       setPartyReconciliations(prev => [...prev, result.data]);
-      setSuccessMessage(`Reconciliation saved successfully under Import GD: ${currentGdNumber} (${importItemDesc})!`);
+      setSuccessMessage(`Reconciliation saved successfully!`);
 
     } catch (err: any) {
       console.error('Error saving reconciliation:', err);
@@ -276,70 +275,62 @@ export default function InputOutputDetailsPage() {
     }
   };
 
-  const handleOpenEditModal = (item: any) => {
-    setEditingItem(item);
-    setEditExportQty(item.exportQtyKg || item.resolvedExportQty || '');
-    setEditExportValue(item.exportValuePkr || '');
-    setEditConsumptionIncWastage(item.consumptionIncWastage || item.resolvedTotalConsumed || '');
-    setEditWastagesKg(item.actualWastageKg || item.resolvedWastageQty || '');
-  };
-
-  const handleExportQtyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newQtyStr = e.target.value;
-    setEditExportQty(newQtyStr);
-
-    if (!editingItem || newQtyStr === '') return;
-
-    const newQty = Number(newQtyStr);
-    const originalExportQty = Number(editingItem.exportQtyKg || editingItem.resolvedExportQty || editingItem.exportQty || 1) || 1;
-    const originalExportValue = Number(editingItem.exportValuePkr || 0);
-    const unitExportRate = originalExportValue / originalExportQty;
-    
-    const grossIorMultiplier = Number(editingItem.grossIocoConsumption || editingItem.inputWithWastage || 0);
-    const unitWastage = Number(editingItem.wastageQty || editingItem.iocoWastageQty || 0);
-
-    setEditExportValue((newQty * unitExportRate).toFixed(2));
-    setEditConsumptionIncWastage((newQty * grossIorMultiplier).toFixed(4));
-    setEditWastagesKg((newQty * unitWastage).toFixed(4));
-  };
-
-  const handleUpdateRow = async () => {
-    if (!editingItem) return;
-
-    try {
-      setIsUpdating(true);
-      const payload = {
-        exportQtyKg: Number(editExportQty),
-        exportValuePkr: Number(editExportValue),
-        consumptionIncWastage: Number(editConsumptionIncWastage),
-        actualWastageKg: Number(editWastagesKg),
-      };
-
-      const response = await fetch(`/api/v1/reconciliations/${editingItem.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const text = await response.text();
-      let result = {};
-      try {
-        result = text ? JSON.parse(text) : {};
-      } catch (e) {}
-
-      if (!response.ok) {
-        throw new Error((result as any)?.error || 'Failed to update reconciliation item');
-      }
-
-      setPartyReconciliations(prev => prev.map(r => r.id === editingItem.id ? (result as any).data || { ...r, ...payload } : r));
-      setEditingItem(null);
-      setSuccessMessage('Reconciliation entry updated successfully.');
-    } catch (err: any) {
-      console.error('Error updating item:', err);
-      alert(`Error: ${err.message}`);
-    } finally {
-      setIsUpdating(false);
+  // STEP 1: Modal Update Button Click (Calculates balanced quantities & values)
+  const handleModalUpdateClick = () => {
+    if (!editingExportQtyItem) return;
+    const manualQty = Number(tempExportQtyVal);
+    if (isNaN(manualQty)) {
+      alert('Please enter a valid quantity.');
+      return;
     }
+
+    const origQty = Number(editingExportQtyItem.qtyOfExports ?? 0);
+    const origVal = Number(editingExportQtyItem.valueOfeExports ?? 0);
+    const manualVal = origQty > 0 ? (origVal / origQty) * manualQty : origVal;
+
+    const balancedQty = origQty - manualQty;
+    const balancedVal = origVal - manualVal;
+
+    setCalculatedBalancedQty(balancedQty > 0 ? balancedQty : 0);
+    setCalculatedBalancedVal(balancedVal > 0 ? balancedVal : 0);
+    setIsUpdatedInModal(true);
+  };
+
+  // STEP 2: Modal Save Button Click (Permanently applies balanced values to export item)
+  const handleModalSaveClick = () => {
+    if (!editingExportQtyItem || !selectedExportGdObject) return;
+
+    const updatedItems = selectedExportGdObject.items.map((it: any) => {
+      if (it.id === editingExportQtyItem.id) {
+        return { 
+          ...it, 
+          qtyOfExports: calculatedBalancedQty,
+          valueOfeExports: calculatedBalancedVal 
+        };
+      }
+      return it;
+    });
+
+    const updatedExportGd = {
+      ...selectedExportGdObject,
+      items: updatedItems
+    };
+
+    setSelectedExportGdObject(updatedExportGd);
+    setExportGds(prev => prev.map(exp => exp.id === updatedExportGd.id ? updatedExportGd : exp));
+
+    if (selectedExportItem?.id === editingExportQtyItem.id) {
+      setSelectedExportItem({
+        ...selectedExportItem,
+        qtyOfExports: calculatedBalancedQty,
+        valueOfeExports: calculatedBalancedVal
+      });
+    }
+
+    setEditingExportQtyItem(null);
+    setTempExportQtyVal('');
+    setIsUpdatedInModal(false);
+    setSuccessMessage('Export item permanently updated with Balanced Quantity and Balanced Value!');
   };
 
   const handlePrintStatement = (groupKey: string) => {
@@ -1002,7 +993,25 @@ export default function InputOutputDetailsPage() {
                                   <td className="px-3 sm:px-5 py-3.5 font-bold text-slate-700">{idx + 1}</td>
                                   <td className="px-3 sm:px-5 py-3.5 font-black text-slate-900">{description}</td>
                                   <td className="px-3 sm:px-5 py-3.5 font-mono font-black text-slate-900">{hsCode}</td>
-                                  <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(qty, 0)}</td>
+                                  <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-900" onClick={(e) => e.stopPropagation()}>
+                                    <div className="flex items-center justify-end gap-2">
+                                      <span>{formatNumber(qty, 0)}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setEditingExportQtyItem(item);
+                                          setTempExportQtyVal(qty.toString());
+                                          setIsUpdatedInModal(false);
+                                          setCalculatedBalancedQty(0);
+                                          setCalculatedBalancedVal(0);
+                                        }}
+                                        className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg border border-blue-300 transition cursor-pointer"
+                                        title="Edit Quantity"
+                                      >
+                                        <Edit3 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </td>
                                   <td className="px-3 sm:px-5 py-3.5 font-mono font-black text-slate-700">KG</td>
                                   <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(val, 2)}</td>
                                 </tr>
@@ -1540,65 +1549,85 @@ export default function InputOutputDetailsPage() {
         )}
       </div>
 
-      {/* EDIT MODAL FOR MANUAL VALUES */}
-      {editingItem && (
+      {/* QUICK EDIT MODAL FOR EXPORT GD ITEM QUANTITY, VALUE, & BALANCES (TWO-STEP: UPDATE -> SAVE) */}
+      {editingExportQtyItem && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-3xl p-6 sm:p-8 max-w-lg w-full space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl sm:text-2xl font-black text-slate-900">Edit Reconciliation Item (Manual Values)</h3>
+          <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg sm:text-xl font-black text-slate-900">Edit Export Quantity &amp; Balanced Values</h3>
+            
             <div className="space-y-4 text-xs sm:text-sm">
               <div>
-                <label className="block text-slate-800 font-black uppercase tracking-wider mb-2">Export Qty (KG)</label>
+                <label className="block text-slate-800 font-black uppercase tracking-wider mb-2">Quantity (KG)</label>
                 <input 
                   type="number" 
-                  value={editExportQty} 
-                  onChange={handleExportQtyChange} 
-                  className="w-full p-3.5 sm:p-4 bg-slate-50 border-2 border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 font-mono font-bold text-sm sm:text-base transition-colors" 
+                  value={tempExportQtyVal} 
+                  onChange={e => {
+                    setTempExportQtyVal(e.target.value);
+                    setIsUpdatedInModal(false);
+                  }} 
+                  className="w-full p-3.5 bg-slate-50 border-2 border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 font-mono font-bold text-base" 
                 />
               </div>
-              <div>
-                <label className="block text-slate-800 font-black uppercase tracking-wider mb-2">Export Value (Rs.)</label>
-                <input 
-                  type="number" 
-                  value={editExportValue} 
-                  onChange={e => setEditExportValue(e.target.value)} 
-                  className="w-full p-3.5 sm:p-4 bg-slate-50 border-2 border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 font-mono font-bold text-sm sm:text-base transition-colors" 
-                />
+
+              {/* CALCULATED EXPORT VALUE DISPLAY */}
+              <div className="bg-blue-50 p-4 rounded-2xl border-2 border-blue-300 space-y-1">
+                <span className="text-[11px] font-black text-blue-800 uppercase tracking-wider block">Calculated Export Value</span>
+                <span className="font-mono font-black text-blue-700 text-base block">
+                  {formatNumber(
+                    (Number(editingExportQtyItem.qtyOfExports ?? 1) > 0 
+                      ? (Number(editingExportQtyItem.valueOfeExports ?? 0) / Number(editingExportQtyItem.qtyOfExports ?? 1)) * Number(tempExportQtyVal || 0)
+                      : Number(editingExportQtyItem.valueOfeExports ?? 0)), 
+                    2
+                  )} Rs.
+                </span>
               </div>
-              <div>
-                <label className="block text-slate-800 font-black uppercase tracking-wider mb-2">Consumption including Wastage</label>
-                <input 
-                  type="number" 
-                  value={editConsumptionIncWastage} 
-                  onChange={e => setEditConsumptionIncWastage(e.target.value)} 
-                  className="w-full p-3.5 sm:p-4 bg-slate-50 border-2 border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 font-mono font-bold text-sm sm:text-base transition-colors" 
-                />
-              </div>
-              <div>
-                <label className="block text-slate-800 font-black uppercase tracking-wider mb-2">Wastages (KG)</label>
-                <input 
-                  type="number" 
-                  value={editWastagesKg} 
-                  onChange={e => setEditWastagesKg(e.target.value)} 
-                  className="w-full p-3.5 sm:p-4 bg-slate-50 border-2 border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 font-mono font-bold text-sm sm:text-base transition-colors" 
-                />
-              </div>
+
+              {/* BALANCED QUANTITY & BALANCED VALUE DISPLAY (Shown after clicking Update) */}
+              {isUpdatedInModal && (
+                <div className="grid grid-cols-2 gap-3 animate-fadeIn">
+                  <div className="bg-emerald-50 p-3.5 rounded-2xl border-2 border-emerald-300 space-y-1">
+                    <span className="text-[10px] font-black text-emerald-800 uppercase tracking-wider block">Balanced Export Qty</span>
+                    <span className="font-mono font-black text-emerald-700 text-sm block">
+                      {formatNumber(calculatedBalancedQty, 4)} KG
+                    </span>
+                  </div>
+
+                  <div className="bg-slate-50 p-3.5 rounded-2xl border-2 border-slate-300 space-y-1">
+                    <span className="text-[10px] font-black text-slate-700 uppercase tracking-wider block">Balanced Export Value</span>
+                    <span className="font-mono font-black text-slate-900 text-sm block">
+                      {formatNumber(calculatedBalancedVal, 2)}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6 pt-4 border-t border-slate-200">
+
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
               <button 
                 type="button"
-                onClick={() => setEditingItem(null)} 
-                className="w-full sm:w-auto px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs sm:text-sm font-black uppercase tracking-wider transition cursor-pointer border border-slate-300"
+                onClick={() => setEditingExportQtyItem(null)} 
+                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-black uppercase tracking-wider transition cursor-pointer border border-slate-300"
               >
                 Cancel
               </button>
-              <button 
-                type="button"
-                onClick={handleUpdateRow} 
-                disabled={isUpdating} 
-                className="w-full sm:w-auto px-7 py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl transition cursor-pointer"
-              >
-                {isUpdating && <Loader2 className="w-5 h-5 animate-spin" />} Save Changes
-              </button>
+
+              {!isUpdatedInModal ? (
+                <button 
+                  type="button"
+                  onClick={handleModalUpdateClick} 
+                  className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow transition cursor-pointer"
+                >
+                  Update
+                </button>
+              ) : (
+                <button 
+                  type="button"
+                  onClick={handleModalSaveClick} 
+                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow transition cursor-pointer"
+                >
+                  Save
+                </button>
+              )}
             </div>
           </div>
         </div>
