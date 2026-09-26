@@ -350,7 +350,6 @@ export default function InputOutputDetailsPage() {
     WindowPrt?.document.write(`
       <html>
         <head>
-          <title>EFS Authorization Certificate Report</title>
           <style>
             @media print {
               @page { size: landscape; margin: 10mm; }
@@ -670,8 +669,8 @@ export default function InputOutputDetailsPage() {
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20 text-blue-100 text-xs sm:text-sm font-black uppercase tracking-wider">
               <ArrowUpRight className="w-4 h-4 text-cyan-400" /> EFS Advanced Compliance &bull; Input Output Ledger Matrix
             </div>
-            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-tight">Input Output Details &amp; EFS Authorization Certificate Statement</h1>
-            <p className="text-sm sm:text-base text-blue-200 font-medium max-w-3xl">
+            <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white leading-tight">Input Output Details &amp; Reconciliation Statement</h1>
+            <p className="text-sm sm:text-base text-blue-200 font-small max-w-3xl">
               Select Name of Trader, Import GD, Export GD, and Analysis Certificate to calculate and save items.
             </p>
           </div>
@@ -1249,7 +1248,7 @@ export default function InputOutputDetailsPage() {
         <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6">
           <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-slate-200 pb-5">
             <div>
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900">EFS Authorization Certificate Statements</h2>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900">Reconciliation Statements</h2>
               <p className="text-xs sm:text-sm text-blue-700 font-black uppercase tracking-wider mt-1">
                 Filter statements by Party and Date Range below.
               </p>
@@ -1505,14 +1504,6 @@ export default function InputOutputDetailsPage() {
                           <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.valueAddition || 0, 2)}%</td>
                           <td className="px-3 py-3.5 text-center no-print">
                             <div className="flex items-center justify-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEditModal(rec)}
-                                className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl border border-blue-300 transition cursor-pointer shadow-sm"
-                                title="Edit Entry"
-                              >
-                                <Edit3 className="w-4 h-4" />
-                              </button>
                               <button
                                 type="button"
                                 onClick={() => handleDeleteRow(rec.id)}

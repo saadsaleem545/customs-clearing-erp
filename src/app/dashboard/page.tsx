@@ -124,7 +124,7 @@ export default function ExecutiveDashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col justify-between relative">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col justify-between relative overflow-x-hidden">
       <style jsx global>{`
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
@@ -132,11 +132,11 @@ export default function ExecutiveDashboardPage() {
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
       `}</style>
 
-      {/* Top Full Width Header with User Profile Box (Clickable to Edit) & Sync Hub */}
-      <header className="bg-gradient-to-r from-blue-700 via-blue-900 to-slate-950 text-white shadow-xl border-b border-blue-900 w-full">
-        <div className="w-full px-8 py-4 flex flex-col lg:flex-row items-center justify-between gap-4">
+      {/* Top Full Width Header with User Profile Box & Sync Hub */}
+      <header className="bg-gradient-to-r from-blue-700 via-blue-900 to-slate-950 text-white shadow-xl border-b border-blue-900 w-full z-25">
+        <div className="w-full px-4 sm:px-8 py-4 flex flex-col lg:flex-row items-center justify-between gap-4 max-w-[1700px] mx-auto">
           <div className="flex items-center gap-4">
-            <span className="text-3xl font-black tracking-wider text-white">
+            <span className="text-2xl sm:text-3xl font-black tracking-wider text-white">
               HASH <span className="text-xs font-mono uppercase bg-blue-600 text-white px-2.5 py-1 rounded shadow-sm">ERP</span>
             </span>
             <span className="text-xs font-semibold text-blue-200 border-l border-blue-600/50 pl-4 hidden sm:inline">
@@ -144,7 +144,7 @@ export default function ExecutiveDashboardPage() {
             </span>
           </div>
 
-          <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-4 flex-wrap justify-center">
             <button
               onClick={fetchDashboardStats}
               disabled={isRefreshing}
@@ -195,42 +195,42 @@ export default function ExecutiveDashboardPage() {
       </header>
 
       {/* Main Container */}
-      <main className="w-full px-6 py-12 flex-grow max-w-[1700px] mx-auto space-y-8">
+      <main className="w-full px-4 sm:px-6 py-8 sm:py-12 flex-grow max-w-[1700px] mx-auto space-y-8">
         
         {/* Command Banner */}
-        <div className="bg-white border-4 border-slate-900 rounded-2xl p-8 shadow-2xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative overflow-hidden">
+        <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-6 sm:p-8 shadow-2xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative overflow-hidden">
           <div className="space-y-2 relative z-10">
-            <h1 className="text-3xl lg:text-4xl font-black text-slate-900 tracking-tight">HASH Logistics Command Dashboard</h1>
-            <p className="text-sm text-slate-600 max-w-2xl leading-relaxed font-medium">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight">HASH Logistics Command Dashboard</h1>
+            <p className="text-xs sm:text-sm text-slate-600 max-w-2xl leading-relaxed font-medium">
               Real-time monitoring of WebOC Customs Goods Declarations, IOCO Input-Output Reconciliation, stock balances, and financial ledgers.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 relative z-10">
+          <div className="flex flex-wrap items-center gap-3 relative z-10 w-full lg:w-auto">
             <Link
               href="/dashboard/imports"
-              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md flex items-center gap-1.5 transition"
+              className="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md flex items-center justify-center gap-1.5 transition text-center"
             >
               <PlusCircle className="w-4 h-4" /> Register Import GD
             </Link>
 
             <Link
               href="/dashboard/exports"
-              className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md flex items-center gap-1.5 transition"
+              className="flex-1 sm:flex-none px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md flex items-center justify-center gap-1.5 transition text-center"
             >
               <PlusCircle className="w-4 h-4" /> Register Export GD
             </Link>
 
             <Link
               href="/dashboard/analysis"
-              className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md flex items-center gap-1.5 transition"
+              className="flex-1 sm:flex-none px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md flex items-center justify-center gap-1.5 transition text-center"
             >
               <PlusCircle className="w-4 h-4" /> Register Analysis Certificate
             </Link>
 
             <Link
               href="/dashboard/reconciliation"
-              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md flex items-center gap-1.5 transition"
+              className="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md flex items-center justify-center gap-1.5 transition text-center"
             >
               <Zap className="w-4 h-4" /> Run IOR Engine
             </Link>
@@ -240,15 +240,15 @@ export default function ExecutiveDashboardPage() {
         {/* Top Metrics Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
           {/* Card 1 */}
-          <div className="bg-white border-2 border-slate-300 hover:border-blue-600 rounded-2xl p-7 shadow-xl transition space-y-4 group">
+          <div className="bg-white border-2 border-slate-300 hover:border-blue-600 rounded-2xl p-6 sm:p-7 shadow-xl transition space-y-4 group">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-black uppercase tracking-wider text-slate-600">Active Clients</span>
+              <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-600">Active Clients</span>
               <div className="p-3 bg-blue-50 text-blue-600 rounded-xl border border-blue-200">
                 <Users className="w-6 h-6" />
               </div>
             </div>
             <div className="space-y-1.5">
-              <div className="text-5xl font-black text-slate-900 font-mono">{stats.activeClients}</div>
+              <div className="text-4xl sm:text-5xl font-black text-slate-900 font-mono">{stats.activeClients}</div>
               <p className="text-xs font-bold text-emerald-600 flex items-center gap-1">
                 <CheckCircle2 className="w-4 h-4 shrink-0" /> +100% Active Verified Importers/Exporters
               </p>
@@ -256,43 +256,43 @@ export default function ExecutiveDashboardPage() {
           </div>
 
           {/* Card 2 */}
-          <div className="bg-white border-2 border-slate-300 hover:border-emerald-600 rounded-2xl p-7 shadow-xl transition space-y-4 group">
+          <div className="bg-white border-2 border-slate-300 hover:border-emerald-600 rounded-2xl p-6 sm:p-7 shadow-xl transition space-y-4 group">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-black uppercase tracking-wider text-slate-600">Import GDs Cleared</span>
+              <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-600">Import GDs Cleared</span>
               <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-200">
                 <FileSpreadsheet className="w-6 h-6" />
               </div>
             </div>
             <div className="space-y-1.5">
-              <div className="text-5xl font-black text-slate-900 font-mono">{stats.importGds}</div>
+              <div className="text-4xl sm:text-5xl font-black text-slate-900 font-mono">{stats.importGds}</div>
               <p className="text-xs font-bold text-slate-700">Bills of Entry Registered &amp; Assessed</p>
             </div>
           </div>
 
           {/* Card 3 */}
-          <div className="bg-white border-2 border-slate-300 hover:border-purple-600 rounded-2xl p-7 shadow-xl transition space-y-4 group">
+          <div className="bg-white border-2 border-slate-300 hover:border-purple-600 rounded-2xl p-6 sm:p-7 shadow-xl transition space-y-4 group">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-black uppercase tracking-wider text-slate-600">Export Shipping Bills</span>
+              <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-600">Export Shipping Bills</span>
               <div className="p-3 bg-purple-50 text-purple-600 rounded-xl border border-purple-200">
                 <FileText className="w-6 h-6" />
               </div>
             </div>
             <div className="space-y-1.5">
-              <div className="text-5xl font-black text-slate-900 font-mono">{stats.exportBills}</div>
+              <div className="text-4xl sm:text-5xl font-black text-slate-900 font-mono">{stats.exportBills}</div>
               <p className="text-xs font-bold text-slate-700">Form-E Filings Verified &amp; Cleared</p>
             </div>
           </div>
 
           {/* Card 4 */}
-          <div className="bg-white border-2 border-slate-300 hover:border-amber-600 rounded-2xl p-7 shadow-xl transition space-y-4 group">
+          <div className="bg-white border-2 border-slate-300 hover:border-amber-600 rounded-2xl p-6 sm:p-7 shadow-xl transition space-y-4 group">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-black uppercase tracking-wider text-slate-600">Total Analysis Certificates</span>
+              <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-600">Total Analysis Certificates</span>
               <div className="p-3 bg-amber-50 text-amber-600 rounded-xl border border-amber-200">
                 <FileText className="w-6 h-6" />
               </div>
             </div>
             <div className="space-y-1.5">
-              <div className="text-5xl font-black text-slate-900 font-mono tracking-tight">
+              <div className="text-4xl sm:text-5xl font-black text-slate-900 font-mono tracking-tight">
                 {stats.totalAnalysisCerts}
               </div>
               <p className="text-xs font-bold text-slate-700">Verified IOCO Certificates Issued</p>
@@ -305,23 +305,23 @@ export default function ExecutiveDashboardPage() {
           {/* 1. Raw Material Stock Engine */}
           <Link 
             href="/dashboard/imports"
-            className="bg-white border-2 border-slate-300 hover:border-emerald-600 rounded-2xl p-7 shadow-xl flex flex-col justify-between transition cursor-pointer group"
+            className="bg-white border-2 border-slate-300 hover:border-emerald-600 rounded-2xl p-6 sm:p-7 shadow-xl flex flex-col justify-between transition cursor-pointer group space-y-5"
           >
             <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-200">
-                    <Database className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-black text-slate-900">Raw Material Stock</h3>
-                    <p className="text-xs text-slate-500 font-bold">FIFO Input Tracking</p>
-                  </div>
+              <div className="flex items-center justify-between">
+                <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-200">
+                  <Database className="w-6 h-6" />
                 </div>
-                <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-200">
-                  View <ArrowUpRight className="w-3.5 h-3.5 inline" />
+                <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 inline-flex items-center gap-1">
+                  View <ArrowUpRight className="w-3.5 h-3.5" />
                 </span>
               </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-black text-slate-900 leading-snug">Raw Material Stock</h3>
+                <p className="text-xs text-slate-500 font-bold">FIFO Input Tracking</p>
+              </div>
+            </div>
+            <div className="border-t border-slate-100 pt-4">
               <p className="text-sm text-slate-700 font-medium leading-relaxed">
                 Real-time inventory levels, FIFO tracking, and registered raw input ledgers.
               </p>
@@ -331,23 +331,23 @@ export default function ExecutiveDashboardPage() {
           {/* 2. Export Shipping Bills Engine */}
           <Link 
             href="/dashboard/exports"
-            className="bg-white border-2 border-slate-300 hover:border-purple-600 rounded-2xl p-7 shadow-xl flex flex-col justify-between transition cursor-pointer group"
+            className="bg-white border-2 border-slate-300 hover:border-purple-600 rounded-2xl p-6 sm:p-7 shadow-xl flex flex-col justify-between transition cursor-pointer group space-y-5"
           >
             <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-purple-50 text-purple-600 rounded-xl border border-purple-200">
-                    <PackageCheck className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-black text-slate-900">Export Shipping Bills</h3>
-                    <p className="text-xs text-slate-500 font-bold">Customs Export GDs</p>
-                  </div>
+              <div className="flex items-center justify-between">
+                <div className="p-3 bg-purple-50 text-purple-600 rounded-xl border border-purple-200">
+                  <PackageCheck className="w-6 h-6" />
                 </div>
-                <span className="text-xs font-black text-purple-700 bg-purple-50 px-3 py-1 rounded-lg border border-purple-200">
-                  View <ArrowUpRight className="w-3.5 h-3.5 inline" />
+                <span className="text-xs font-black text-purple-700 bg-purple-50 px-3 py-1.5 rounded-xl border border-purple-200 inline-flex items-center gap-1">
+                  View <ArrowUpRight className="w-3.5 h-3.5" />
                 </span>
               </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-black text-slate-900 leading-snug">Export Shipping Bills</h3>
+                <p className="text-xs text-slate-500 font-bold">Customs Export GDs</p>
+              </div>
+            </div>
+            <div className="border-t border-slate-100 pt-4">
               <p className="text-sm text-slate-700 font-medium leading-relaxed">
                 Track processed customs export declarations, Form-E clearances, and shipments.
               </p>
@@ -357,23 +357,23 @@ export default function ExecutiveDashboardPage() {
           {/* 3. Analysis Certificate Manager */}
           <Link 
             href="/dashboard/analysis"
-            className="bg-white border-2 border-slate-300 hover:border-amber-600 rounded-2xl p-7 shadow-xl flex flex-col justify-between transition cursor-pointer group"
+            className="bg-white border-2 border-slate-300 hover:border-amber-600 rounded-2xl p-6 sm:p-7 shadow-xl flex flex-col justify-between transition cursor-pointer group space-y-5"
           >
             <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-amber-50 text-amber-600 rounded-xl border border-amber-200">
-                    <FileCheck2 className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-black text-slate-900">Analysis Certificates</h3>
-                    <p className="text-xs text-slate-500 font-bold">IOCO &amp; Wastage Matrix</p>
-                  </div>
+              <div className="flex items-center justify-between">
+                <div className="p-3 bg-amber-50 text-amber-600 rounded-xl border border-amber-200">
+                  <FileCheck2 className="w-6 h-6" />
                 </div>
-                <span className="text-xs font-black text-amber-700 bg-amber-50 px-3 py-1 rounded-lg border border-amber-200">
-                  View <ArrowUpRight className="w-3.5 h-3.5 inline" />
+                <span className="text-xs font-black text-amber-700 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 inline-flex items-center gap-1">
+                  View <ArrowUpRight className="w-3.5 h-3.5" />
                 </span>
               </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-black text-slate-900 leading-snug">Analysis Certificates</h3>
+                <p className="text-xs text-slate-500 font-bold">IOCO &amp; Wastage Matrix</p>
+              </div>
+            </div>
+            <div className="border-t border-slate-100 pt-4">
               <p className="text-sm text-slate-700 font-medium leading-relaxed">
                 Manage issued IOCO certificates, wastage allowances, and approved ratios.
               </p>
@@ -383,23 +383,23 @@ export default function ExecutiveDashboardPage() {
           {/* 4. IOR Audit Engine */}
           <Link 
             href="/dashboard/reconciliation"
-            className="bg-white border-2 border-slate-300 hover:border-blue-600 rounded-2xl p-7 shadow-xl flex flex-col justify-between transition cursor-pointer group"
+            className="bg-white border-2 border-slate-300 hover:border-blue-600 rounded-2xl p-6 sm:p-7 shadow-xl flex flex-col justify-between transition cursor-pointer group space-y-5"
           >
             <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-blue-50 text-blue-600 rounded-xl border border-blue-200">
-                    <Scale className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-black text-slate-900">IOR Audit Engine</h3>
-                    <p className="text-xs text-slate-500 font-bold">Input-Output Reconciliation</p>
-                  </div>
+              <div className="flex items-center justify-between">
+                <div className="p-3 bg-blue-50 text-blue-600 rounded-xl border border-blue-200">
+                  <Scale className="w-6 h-6" />
                 </div>
-                <span className="text-xs font-black text-blue-700 bg-blue-50 px-3 py-1 rounded-lg border border-blue-200">
-                  Open <ArrowUpRight className="w-3.5 h-3.5 inline" />
+                <span className="text-xs font-black text-blue-700 bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-200 inline-flex items-center gap-1">
+                  Open <ArrowUpRight className="w-3.5 h-3.5" />
                 </span>
               </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-black text-slate-900 leading-snug">IOR Audit Engine</h3>
+                <p className="text-xs text-slate-500 font-bold">Input-Output Reconciliation</p>
+              </div>
+            </div>
+            <div className="border-t border-slate-100 pt-4">
               <p className="text-sm text-slate-700 font-medium leading-relaxed">
                 Run comprehensive input-output reconciliations, audits, and compliance ledgers.
               </p>
@@ -410,21 +410,21 @@ export default function ExecutiveDashboardPage() {
       </main>
 
       {/* Footer with Gradient Background */}
-      <footer className="bg-gradient-to-r from-blue-700 via-blue-900 to-slate-950 text-blue-200 text-center py-4 text-xs border-t border-blue-900 w-full shadow-inner">
+      <footer className="bg-gradient-to-r from-blue-700 via-blue-900 to-slate-950 text-blue-200 text-center py-4 text-xs border-t border-blue-900 w-full shadow-inner mt-8">
         &copy; 2026 Customs Clearing ERP &bull; Powered by EFS Advanced Compliance Engine. All rights reserved.
       </footer>
 
       {/* Edit Profile Modal */}
       {isEditProfileOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border-4 border-slate-900 rounded-3xl max-w-lg w-full p-8 shadow-2xl space-y-6 relative animate-in fade-in zoom-in duration-200">
+          <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl space-y-6 relative animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-200 pb-4">
               <div className="flex items-center gap-3">
                 <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl border border-blue-200">
                   <UserCheck className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-slate-900">Edit Administrator Profile</h3>
+                  <h3 className="text-lg sm:text-xl font-black text-slate-900">Edit Administrator Profile</h3>
                   <p className="text-xs text-slate-500 font-bold">Update profile picture, username &amp; security credentials</p>
                 </div>
               </div>

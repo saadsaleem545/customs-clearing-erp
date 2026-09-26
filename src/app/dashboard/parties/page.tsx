@@ -201,7 +201,7 @@ export default function PartiesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col justify-between p-6 space-y-8 max-w-[1700px] mx-auto">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col justify-between p-6 space-y-8 max-w-[1700px] mx-auto overflow-x-hidden">
       <style jsx global>{`
         @media print {
           body * {
@@ -259,7 +259,6 @@ export default function PartiesPage() {
             </p>
           </div>
 
-          {/* Changed Button Color from Green to Blue */}
           <button
             onClick={() => {
               setFormData({ companyName: '', ntn: '', address: '' });
@@ -311,51 +310,52 @@ export default function PartiesPage() {
               key={party.id} 
               className="bg-white border-2 border-slate-300 hover:border-blue-600 rounded-2xl shadow-xl transition overflow-hidden group flex flex-col justify-between"
             >
-              <div className="p-7 space-y-5">
-                <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+              <div className="p-6 sm:p-7 space-y-5">
+                {/* Top Row: Party Code & All Action Buttons Wrap-Fixed */}
+                <div className="flex items-center justify-between border-b border-slate-200 pb-4 gap-2 flex-wrap">
                   <span className="text-xs font-black text-purple-700 bg-purple-50 px-3 py-1 rounded-lg border border-purple-200 font-mono">
                     {party.partyCode}
                   </span>
                   
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <button
                       onClick={() => handleViewImports(party)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl border border-emerald-200 transition text-xs font-black uppercase tracking-wider cursor-pointer shadow-sm"
+                      className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg border border-emerald-200 transition text-[11px] font-black uppercase tracking-wider cursor-pointer shadow-sm inline-flex items-center gap-1"
                       title="View Party Imports"
                     >
-                      <Download className="w-3.5 h-3.5" /> Imports
+                      <Download className="w-3 h-3" /> Imp
                     </button>
                     <button
                       onClick={() => handleViewExports(party)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl border border-blue-200 transition text-xs font-black uppercase tracking-wider cursor-pointer shadow-sm"
+                      className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg border border-blue-200 transition text-[11px] font-black uppercase tracking-wider cursor-pointer shadow-sm inline-flex items-center gap-1"
                       title="View Party Exports"
                     >
-                      <FileText className="w-3.5 h-3.5" /> Exports
+                      <FileText className="w-3 h-3" /> Exp
                     </button>
                     <button
                       onClick={() => openEditModal(party)}
-                      className="p-2.5 rounded-xl bg-white hover:bg-slate-200 text-slate-700 transition border border-slate-300 shadow-sm cursor-pointer"
+                      className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition border border-slate-200 shadow-sm cursor-pointer"
                       title="Edit Party"
                     >
-                      <Edit3 className="w-4 h-4" />
+                      <Edit3 className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => handleDelete(party.id)}
-                      className="p-2.5 rounded-xl bg-white hover:bg-red-50 text-red-600 transition border border-slate-300 shadow-sm cursor-pointer"
+                      className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 transition border border-red-200 shadow-sm cursor-pointer"
                       title="Delete Party"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <h3 className="text-lg font-black text-slate-900 group-hover:text-blue-600 transition tracking-tight">
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 group-hover:text-blue-600 transition tracking-tight leading-snug">
                     {party.companyName}
                   </h3>
-                  <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 text-xs font-bold font-mono">
+                  <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 text-xs font-bold font-mono w-full">
                     <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
-                    <span>EFS Cert: {party.ntn}</span>
+                    <span className="truncate">EFS Cert: {party.ntn}</span>
                   </div>
                 </div>
 
@@ -365,7 +365,7 @@ export default function PartiesPage() {
                 </div>
               </div>
 
-              <div className="px-7 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs">
+              <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs">
                 <span className="font-black text-slate-500 uppercase tracking-wider text-[11px]">Authorized EFS Importer</span>
               </div>
             </div>

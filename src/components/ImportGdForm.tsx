@@ -469,7 +469,7 @@ export default function ImportGdForm() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col justify-between p-3 sm:p-6 space-y-6 sm:space-y-8 max-w-[1700px] mx-auto overflow-x-hidden">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col justify-between p-3 sm:p-6 space-y-6 sm:space-y-8 max-w-[1700px] mx-auto w-full">
       <style jsx global>{`
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
@@ -478,14 +478,14 @@ export default function ImportGdForm() {
       `}</style>
 
       {/* Top Banner Header */}
-      <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl shadow-xl overflow-hidden">
-        <div className="bg-gradient-to-r from-blue-700 via-blue-900 to-slate-950 p-5 sm:p-8 text-white flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 sm:gap-6">
+      <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl shadow-xl overflow-hidden w-full">
+        <div className="bg-gradient-to-r from-blue-700 via-blue-900 to-slate-950 p-6 sm:p-8 text-white flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-blue-100 text-xs sm:text-sm font-black uppercase tracking-wider">
-              <ArrowDownLeft className="w-4 h-4 text-cyan-400" /> WebOC Gateway &bull; Import Clearance Management
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/10 border border-white/20 text-blue-100 text-xs font-black uppercase tracking-wider">
+              <ArrowDownLeft className="w-3.5 h-3.5 text-cyan-400" /> WebOC Gateway &bull; Import Clearance Management
             </div>
-            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-tight">Import Clearance (GD)</h1>
-            <p className="text-sm sm:text-base text-blue-200 font-medium max-w-2xl">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-white leading-tight">Import Clearance (GD)</h1>
+            <p className="text-xs sm:text-sm text-blue-200 font-medium max-w-2xl">
               Upload Excel sheets for auto-extraction with separate GD No & Date columns or use manual entry forms.
             </p>
           </div>
@@ -494,14 +494,14 @@ export default function ImportGdForm() {
             <button
               type="button"
               onClick={() => setActiveTab('auto')}
-              className={`flex-1 sm:flex-none px-4 sm:px-5 py-3 rounded-xl text-xs sm:text-sm font-black uppercase tracking-wider transition flex items-center justify-center gap-2 shadow cursor-pointer ${activeTab === 'auto' ? 'bg-blue-600 text-white shadow-blue-600/30' : 'bg-blue-900/80 text-blue-200 hover:bg-blue-800 border border-blue-600/40'}`}
+              className={`flex-1 sm:flex-none px-4 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-2 shadow cursor-pointer ${activeTab === 'auto' ? 'bg-blue-600 text-white shadow-blue-600/30' : 'bg-blue-900/80 text-blue-200 hover:bg-blue-800 border border-blue-600/40'}`}
             >
               <FileSpreadsheet className="w-4 h-4" /> Auto Excel Import
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('manual')}
-              className={`flex-1 sm:flex-none px-4 sm:px-5 py-3 rounded-xl text-xs sm:text-sm font-black uppercase tracking-wider transition flex items-center justify-center gap-2 shadow cursor-pointer ${activeTab === 'manual' ? 'bg-blue-600 text-white shadow-blue-600/30' : 'bg-blue-900/80 text-blue-200 hover:bg-blue-800 border border-blue-600/40'}`}
+              className={`flex-1 sm:flex-none px-4 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-2 shadow cursor-pointer ${activeTab === 'manual' ? 'bg-blue-600 text-white shadow-blue-600/30' : 'bg-blue-900/80 text-blue-200 hover:bg-blue-800 border border-blue-600/40'}`}
             >
               <Edit3 className="w-4 h-4" /> Manual Entry Form
             </button>
@@ -511,7 +511,7 @@ export default function ImportGdForm() {
 
       {/* --- TAB 1: AUTO EXCEL UPLOAD BOX --- */}
       {activeTab === 'auto' && (
-        <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6">
+        <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6 w-full">
           <div className="flex items-center justify-between border-b border-slate-200 pb-4">
             <h2 className="text-xl sm:text-2xl font-black text-slate-900 flex items-center gap-2.5">
               <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl border border-blue-200">
@@ -543,7 +543,7 @@ export default function ImportGdForm() {
             {items.length > 0 && (
               <div className="space-y-3">
                 <h3 className="text-base sm:text-lg font-black text-slate-900">Extracted Import Matrix Preview</h3>
-                <div className="overflow-x-auto border-2 border-slate-300 rounded-2xl shadow-sm bg-white">
+                <div className="overflow-x-auto border-2 border-slate-900 rounded-2xl shadow-sm bg-white">
                   <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
                     <thead className="bg-slate-900 text-white font-black uppercase text-[11px] sm:text-xs tracking-wider">
                       <tr>
@@ -588,7 +588,7 @@ export default function ImportGdForm() {
 
       {/* --- TAB 2: MANUAL ENTRY FORM BOX --- */}
       {activeTab === 'manual' && (
-        <form onSubmit={handleSaveManualImport} className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6">
+        <form onSubmit={handleSaveManualImport} className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6 w-full">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
             <h2 className="text-xl sm:text-2xl font-black text-slate-900 flex items-center gap-2.5">
               <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl border border-blue-200">
@@ -748,7 +748,7 @@ export default function ImportGdForm() {
       )}
 
       {/* Saved Imports History Section */}
-      <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6">
+      <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6 w-full">
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-slate-200 pb-5">
           <div>
             <h3 className="text-xl sm:text-2xl font-black text-slate-900">Saved Imports History (Database Records)</h3>
@@ -756,9 +756,9 @@ export default function ImportGdForm() {
           </div>
         </div>
 
-        {/* Filter Controls Bar */}
-        <div className="bg-slate-50 border-2 border-slate-300 p-4 sm:p-5 rounded-2xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 items-end shadow-sm">
-          <div className="lg:col-span-4 space-y-1.5">
+        {/* Filter Controls Bar - Fixed with Flexbox layout so everything stays neatly inside */}
+        <div className="bg-slate-50 border-2 border-slate-300 p-4 sm:p-5 rounded-2xl flex flex-wrap items-end gap-4 shadow-sm">
+          <div className="flex-1 min-w-[220px] space-y-1.5">
             <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700">Filter by Party</label>
             <select
               value={filterPartyId}
@@ -772,7 +772,7 @@ export default function ImportGdForm() {
             </select>
           </div>
 
-          <div className="lg:col-span-3 space-y-1.5">
+          <div className="w-[160px] space-y-1.5">
             <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700">From Date</label>
             <input
               type="date"
@@ -782,7 +782,7 @@ export default function ImportGdForm() {
             />
           </div>
 
-          <div className="lg:col-span-3 space-y-1.5">
+          <div className="w-[160px] space-y-1.5">
             <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700">To Date</label>
             <input
               type="date"
@@ -792,18 +792,18 @@ export default function ImportGdForm() {
             />
           </div>
 
-          <div className="lg:col-span-2 flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <button
               onClick={handlePrintFilteredReport}
               disabled={filteredImports.length === 0}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-black uppercase tracking-wider py-3 px-3 rounded-xl transition flex items-center justify-center gap-1.5 shadow cursor-pointer disabled:opacity-50"
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-black uppercase tracking-wider py-3 px-4 rounded-xl transition flex items-center justify-center gap-1.5 shadow cursor-pointer disabled:opacity-50 whitespace-nowrap"
               title="Print Filtered Results"
             >
               <Printer className="w-4 h-4" /> Print
             </button>
             <button
               onClick={() => { setFilterPartyId(''); setFilterFromDate(''); setFilterToDate(''); setHistorySearch(''); }}
-              className="px-4 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs sm:text-sm font-black uppercase tracking-wider rounded-xl transition cursor-pointer border border-slate-300 shadow-sm"
+              className="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs sm:text-sm font-black uppercase tracking-wider py-3 px-4 rounded-xl transition cursor-pointer border border-slate-300 shadow-sm whitespace-nowrap"
               title="Reset Filters"
             >
               Reset
@@ -816,7 +816,7 @@ export default function ImportGdForm() {
             {savedImports.length === 0 ? 'No import records found in database yet.' : 'No matching import GD found for selected party or date range.'}
           </p>
         ) : (
-          <div className="overflow-x-auto border-2 border-slate-300 rounded-2xl shadow-sm bg-white">
+          <div className="overflow-x-auto border-2 border-slate-900 rounded-2xl shadow-sm bg-white">
             <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
               <thead className="bg-slate-900 text-white font-black uppercase text-[11px] sm:text-xs tracking-wider">
                 <tr>
@@ -834,23 +834,25 @@ export default function ImportGdForm() {
                     <td className="px-4 py-3.5 font-mono text-xs sm:text-sm font-black text-blue-700">{rec.gdNumber}</td>
                     <td className="px-4 py-3.5 font-mono text-xs sm:text-sm font-black text-slate-900">{rec.gdDate ? new Date(rec.gdDate).toLocaleDateString() : ''}</td>
                     <td className="px-4 py-3.5">
-                      <span className="bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 rounded-lg text-xs sm:text-sm font-black font-mono">
+                      <span className="text-blue-700 px-3 py-1 text-xs sm:text-sm font-black font-mono">
                         {rec.items?.length || 0} items
                       </span>
                     </td>
-                    <td className="px-4 py-3.5 text-center space-x-2 whitespace-nowrap">
-                      <button
-                        onClick={() => setSelectedGdItems({ items: rec.items, gdNumber: rec.gdNumber, partyName: rec.party?.companyName })}
-                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase tracking-wider px-3.5 sm:px-4 py-2 rounded-xl transition cursor-pointer shadow"
-                      >
-                        View Items
-                      </button>
-                      <button
-                        onClick={() => handleDelete(rec.id, rec.gdNumber)}
-                        className="bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-wider px-3.5 sm:px-4 py-2 rounded-xl transition cursor-pointer shadow"
-                      >
-                        Delete
-                      </button>
+                    <td className="px-4 py-3.5 text-center">
+                      <div className="flex items-center justify-center gap-2 flex-wrap">
+                        <button
+                          onClick={() => setSelectedGdItems({ items: rec.items, gdNumber: rec.gdNumber, partyName: rec.party?.companyName})}
+                          className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase tracking-wider px-3.5 py-2 rounded-xl transition cursor-pointer shadow"
+                        >
+                          View Items
+                        </button>
+                        <button
+                          onClick={() => handleDelete(rec.id, rec.gdNumber)}
+                          className="bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-wider px-3.5 py-2 rounded-xl transition cursor-pointer shadow"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -892,7 +894,7 @@ export default function ImportGdForm() {
               </div>
             </div>
 
-            <div className="overflow-x-auto border-2 border-slate-300 rounded-2xl shadow-sm bg-white">
+            <div className="overflow-x-auto border-2 border-slate-900 rounded-2xl shadow-sm bg-white">
               <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
                 <thead className="bg-slate-900 text-white font-black uppercase text-[11px] sm:text-xs tracking-wider">
                   <tr>
