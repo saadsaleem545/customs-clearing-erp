@@ -27,6 +27,19 @@ export default function AnalysisCertificatePage() {
   const [filterPartyId, setFilterPartyId] = useState('');
   const [searchCertNo, setSearchCertNo] = useState('');
 
+  // Custom Professional Confirmation Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+
   // Manual Item Form States
   const [hsCodeInput, setHsCodeInput] = useState('');
   const [descInput, setDescInput] = useState('');
@@ -204,24 +217,31 @@ export default function AnalysisCertificatePage() {
     }
   };
 
-  const handleDeleteCertificate = async (id: string, certNo: string) => {
-    if (!confirm(`Are you sure you want to delete Analysis Certificate: ${certNo}?`)) return;
-
-    try {
-      const res = await fetch(`/api/v1/analysis?id=${id}`, {
-        method: 'DELETE',
-      });
-      const result = await res.json();
-      if (result.success) {
-        alert('Analysis Certificate deleted successfully.');
-        fetchPartiesAndCerts();
-      } else {
-        alert(result.error || 'Failed to delete certificate.');
+  const handleDeleteCertificate = (id: string, certNo: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Analysis Certificate',
+      message: `Are you sure you want to delete Analysis Certificate: ${certNo}?`,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/v1/analysis?id=${id}`, {
+            method: 'DELETE',
+          });
+          const result = await res.json();
+          if (result.success) {
+            alert('Analysis Certificate deleted successfully.');
+            fetchPartiesAndCerts();
+          } else {
+            alert(result.error || 'Failed to delete certificate.');
+          }
+        } catch (err) {
+          console.error(err);
+          alert('Error deleting certificate.');
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
       }
-    } catch (err) {
-      console.error(err);
-      alert('Error deleting certificate.');
-    }
+    });
   };
 
   const handlePrintCertificate = (certId: string) => {
@@ -570,6 +590,35 @@ export default function AnalysisCertificatePage() {
       <footer className="bg-gradient-to-r from-blue-700 via-blue-900 to-slate-950 text-blue-200 text-center py-4 text-xs sm:text-sm font-bold border-t border-blue-900 w-full shadow-inner rounded-2xl no-print">
         &copy; 2026 Customs Clearing ERP &bull; Powered by EFS Advanced Compliance Engine. All rights reserved.
       </footer>
+
+      {/* CUSTOM PROFESSIONAL CONFIRMATION MODAL */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-6 shadow-2xl">
+            <div className="space-y-2">
+              <h3 className="text-xl font-black text-slate-900">{confirmModal.title}</h3>
+              <p className="text-xs sm:text-sm font-bold text-slate-600">{confirmModal.message}</p>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-black uppercase tracking-wider transition cursor-pointer border border-slate-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmModal.onConfirm}
+                className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow transition cursor-pointer"
+              >
+                Confirm Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {selectedMobileCertItems && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4 animate-fadeIn">

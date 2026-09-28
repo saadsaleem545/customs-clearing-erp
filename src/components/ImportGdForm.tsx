@@ -15,6 +15,19 @@ export default function ImportGdForm() {
   const [message, setMessage] = useState('');
   const [historySearch, setHistorySearch] = useState('');
 
+  // Custom Professional Confirmation Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+
   // Advanced Filter States for History Section
   const [filterPartyId, setFilterPartyId] = useState('');
   const [filterFromDate, setFilterFromDate] = useState('');
@@ -269,7 +282,7 @@ export default function ImportGdForm() {
 
     const matchedParty = parties.find(
       p => p.companyName.toLowerCase().includes(extractedPartyName.toLowerCase()) || 
-            extractedPartyName.toLowerCase().includes(p.companyName.toLowerCase())
+           extractedPartyName.toLowerCase().includes(p.companyName.toLowerCase())
     );
     const partyId = matchedParty ? matchedParty.id : (parties.length > 0 ? parties[0].id : null);
 
@@ -329,23 +342,30 @@ export default function ImportGdForm() {
     }
   };
 
-  const handleDelete = async (recordId: string, gdNumber: string) => {
-    if (!confirm(`Are you sure you want to delete Import GD: ${gdNumber}?`)) return;
-
-    try {
-      const res = await fetch(`/api/v1/imports?id=${encodeURIComponent(recordId)}`, {
-        method: 'DELETE',
-      });
-      const json = await res.json();
-      if (json.success) {
-        alert('Import GD deleted successfully!');
-        fetchData();
-      } else {
-        alert('Error deleting: ' + (json.error || 'Failed'));
+  const handleDelete = (recordId: string, gdNumber: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Import GD',
+      message: `Are you sure you want to delete Import GD: ${gdNumber}?`,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/v1/imports?id=${encodeURIComponent(recordId)}`, {
+            method: 'DELETE',
+          });
+          const json = await res.json();
+          if (json.success) {
+            alert('Import GD deleted successfully!');
+            fetchData();
+          } else {
+            alert('Error deleting: ' + (json.error || 'Failed'));
+          }
+        } catch (err: any) {
+          alert('Delete failed: ' + err.message);
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
       }
-    } catch (err: any) {
-      alert('Delete failed: ' + err.message);
-    }
+    });
   };
 
   const triggerPrint = (title: string, subTitle: string, dataItems: any[]) => {
@@ -866,6 +886,35 @@ export default function ImportGdForm() {
       <footer className="bg-gradient-to-r from-blue-700 via-blue-900 to-slate-950 text-blue-200 text-center py-4 text-xs sm:text-sm font-bold border-t border-blue-900 w-full shadow-inner rounded-2xl">
         &copy; 2026 Customs Clearing ERP &bull; Powered by EFS Advanced Compliance Engine. All rights reserved.
       </footer>
+
+      {/* CUSTOM PROFESSIONAL CONFIRMATION MODAL */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-6 shadow-2xl">
+            <div className="space-y-2">
+              <h3 className="text-xl font-black text-slate-900">{confirmModal.title}</h3>
+              <p className="text-xs sm:text-sm font-bold text-slate-600">{confirmModal.message}</p>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-black uppercase tracking-wider transition cursor-pointer border border-slate-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmModal.onConfirm}
+                className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow transition cursor-pointer"
+              >
+                Confirm Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Popup */}
       {selectedGdItems && (

@@ -31,6 +31,21 @@ export default function InputOutputDetailsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
 
+  // Custom Professional Confirmation / Alert Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    isAlertOnly?: boolean;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    isAlertOnly: false,
+    onConfirm: () => {},
+  });
+
   // Quick Edit State for Export GD Item Quantity & Value (Two-Step: Update then Save)
   const [editingExportQtyItem, setEditingExportQtyItem] = useState<any>(null);
   const [tempExportQtyVal, setTempExportQtyVal] = useState('');
@@ -191,88 +206,114 @@ export default function InputOutputDetailsPage() {
     }
   };
 
-  const handleClearAllReconciliations = async () => {
+  const handleClearAllReconciliations = () => {
     if (!selectedPartyId && filterPartyId === 'ALL') {
-      alert('Please select a party or filter first.');
+      setConfirmModal({
+        isOpen: true,
+        title: 'Action Required',
+        message: 'Please select a party or filter first.',
+        isAlertOnly: true,
+        onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      });
       return;
     }
     const targetParty = filterPartyId !== 'ALL' ? filterPartyId : selectedPartyId;
-    if (!confirm(`Are you sure you want to clear all saved reconciliations for this selection?`)) {
-      return;
-    }
 
-    try {
-      setIsClearing(true);
-      const response = await fetch(`/api/v1/reconciliations?partyId=${targetParty}`, {
-        method: 'DELETE',
-      });
+    setConfirmModal({
+      isOpen: true,
+      title: 'Clear All Reconciliations',
+      message: 'Are you sure you want to clear all saved reconciliations for this selection?',
+      isAlertOnly: false,
+      onConfirm: async () => {
+        try {
+          setIsClearing(true);
+          const response = await fetch(`/api/v1/reconciliations?partyId=${targetParty}`, {
+            method: 'DELETE',
+          });
 
-      const text = await response.text();
-      let result = {};
-      try {
-        result = text ? JSON.parse(text) : {};
-      } catch (e) {}
+          const text = await response.text();
+          let result = {};
+          try {
+            result = text ? JSON.parse(text) : {};
+          } catch (e) {}
 
-      if (!response.ok) {
-        throw new Error((result as any)?.error || 'Failed to clear reconciliations');
+          if (!response.ok) {
+            throw new Error((result as any)?.error || 'Failed to clear reconciliations');
+          }
+
+          setPartyReconciliations(prev => prev.filter(r => r.partyId !== targetParty));
+          setSuccessMessage('All reconciliations have been successfully cleared.');
+        } catch (err: any) {
+          console.error('Error clearing reconciliations:', err);
+          alert(`Error: ${err.message}`);
+        } finally {
+          setIsClearing(false);
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
       }
-
-      setPartyReconciliations(prev => prev.filter(r => r.partyId !== targetParty));
-      setSuccessMessage('All reconciliations have been successfully cleared.');
-    } catch (err: any) {
-      console.error('Error clearing reconciliations:', err);
-      alert(`Error: ${err.message}`);
-    } finally {
-      setIsClearing(false);
-    }
+    });
   };
 
-  const handleClearSingleGdStatement = async (groupKey: string, records: any[]) => {
-    if (!confirm(`Are you sure you want to clear this item statement?`)) {
-      return;
-    }
+  const handleClearSingleGdStatement = (groupKey: string, records: any[]) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Clear Item Statement',
+      message: 'Are you sure you want to clear this item statement?',
+      isAlertOnly: false,
+      onConfirm: async () => {
+        try {
+          const deletePromises = records.map(rec => fetch(`/api/v1/reconciliations/${rec.id}`, { method: 'DELETE' }));
+          await Promise.all(deletePromises);
 
-    try {
-      const deletePromises = records.map(rec => fetch(`/api/v1/reconciliations/${rec.id}`, { method: 'DELETE' }));
-      await Promise.all(deletePromises);
-
-      setPartyReconciliations(prev => prev.filter(r => {
-        const gdNo = r.importGdNo || r.importGdNumber || 'GENERAL_GD';
-        const materialId = r.inputMaterialId || r.importMaterialId || 'item';
-        const impQty = Number(r.importQty || r.importQtyKg || 0);
-        const currentKey = `${gdNo}___${materialId}___${impQty}`;
-        return currentKey !== groupKey;
-      }));
-      setSuccessMessage(`Statement has been successfully cleared.`);
-    } catch (err: any) {
-      console.error('Error clearing statement:', err);
-      alert(`Error: ${err.message}`);
-    }
+          setPartyReconciliations(prev => prev.filter(r => {
+            const gdNo = r.importGdNo || r.importGdNumber || 'GENERAL_GD';
+            const materialId = r.inputMaterialId || r.importMaterialId || 'item';
+            const impQty = Number(r.importQty || r.importQtyKg || 0);
+            const currentKey = `${gdNo}___${materialId}___${impQty}`;
+            return currentKey !== groupKey;
+          }));
+          setSuccessMessage(`Statement has been successfully cleared.`);
+        } catch (err: any) {
+          console.error('Error clearing statement:', err);
+          alert(`Error: ${err.message}`);
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
   };
 
-  const handleDeleteRow = async (itemId: string) => {
-    if (!confirm('Are you sure you want to delete this entry?')) return;
+  const handleDeleteRow = (itemId: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Entry',
+      message: 'Are you sure you want to delete this entry?',
+      isAlertOnly: false,
+      onConfirm: async () => {
+        try {
+          const response = await fetch(`/api/v1/reconciliations/${itemId}`, {
+            method: 'DELETE',
+          });
+          const text = await response.text();
+          let result = {};
+          try {
+            result = text ? JSON.parse(text) : {};
+          } catch (e) {}
 
-    try {
-      const response = await fetch(`/api/v1/reconciliations/${itemId}`, {
-        method: 'DELETE',
-      });
-      const text = await response.text();
-      let result = {};
-      try {
-        result = text ? JSON.parse(text) : {};
-      } catch (e) {}
+          if (!response.ok) {
+            throw new Error((result as any)?.error || 'Failed to delete reconciliation item');
+          }
 
-      if (!response.ok) {
-        throw new Error((result as any)?.error || 'Failed to delete reconciliation item');
+          setPartyReconciliations(prev => prev.filter(item => item.id !== itemId));
+          setSuccessMessage('Reconciliation entry deleted successfully.');
+        } catch (err: any) {
+          console.error('Error deleting item:', err);
+          alert(`Error: ${err.message}`);
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
       }
-
-      setPartyReconciliations(prev => prev.filter(item => item.id !== itemId));
-      setSuccessMessage('Reconciliation entry deleted successfully.');
-    } catch (err: any) {
-      console.error('Error deleting item:', err);
-      alert(`Error: ${err.message}`);
-    }
+    });
   };
 
   // STEP 1: Modal Update Button Click (Calculates balanced quantities & values)
@@ -1628,6 +1669,37 @@ export default function InputOutputDetailsPage() {
                   Save
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CUSTOM PROFESSIONAL CONFIRMATION / ALERT MODAL */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-6 shadow-2xl">
+            <div className="space-y-2">
+              <h3 className="text-xl font-black text-slate-900">{confirmModal.title}</h3>
+              <p className="text-xs sm:text-sm font-bold text-slate-600">{confirmModal.message}</p>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+              {!confirmModal.isAlertOnly && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-black uppercase tracking-wider transition cursor-pointer border border-slate-300"
+                >
+                  Cancel
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={confirmModal.onConfirm}
+                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow transition cursor-pointer"
+              >
+                {confirmModal.isAlertOnly ? 'OK' : 'Confirm Delete'}
+              </button>
             </div>
           </div>
         </div>
