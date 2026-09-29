@@ -22,11 +22,17 @@ import {
   Camera,
   KeyRound,
   User as UserIcon,
-  Check
+  Check,
+  ArrowLeft,
+  ArrowRight,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function ExecutiveDashboardPage() {
+  const router = useRouter();
   const [stats, setStats] = useState({
     activeClients: 3,
     importGds: 3,
@@ -36,16 +42,26 @@ export default function ExecutiveDashboardPage() {
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // User Profile State
+  // User Profile State with localStorage persistence
   const [userName, setUserName] = useState("Saad Saleem");
   const [userRole, setUserRole] = useState("SUPER ADMIN");
   const [profilePic, setProfilePic] = useState<string | null>(null);
+  
+  // Load saved profile data from localStorage on initial mount
+  useEffect(() => {
+    const savedName = localStorage.getItem('erp_username');
+    const savedPic = localStorage.getItem('erp_profile_pic');
+    if (savedName) setUserName(savedName);
+    if (savedPic) setProfilePic(savedPic);
+  }, []);
   
   // Edit Profile Modal State
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [newUsername, setNewUsername] = useState(userName);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [profileMessage, setProfileMessage] = useState({ type: '', text: '' });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -94,33 +110,102 @@ export default function ExecutiveDashboardPage() {
     fetchDashboardStats();
   }, []);
 
+  // Compressed Image Upload to prevent LocalStorage Quota Exceeded Error
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setProfilePic(reader.result as string);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 200;
+          const MAX_HEIGHT = 200;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+          setProfilePic(dataUrl);
+          try {
+            localStorage.setItem('erp_profile_pic', dataUrl);
+          } catch (err) {
+            console.error('Storage quota exceeded', err);
+            alert('Image size is too large. Please select a smaller image.');
+          }
+        };
+        img.src = event.target?.result as string;
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleUpdateProfile = (e: React.FormEvent) => {
+  const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     setProfileMessage({ type: '', text: '' });
 
-    setTimeout(() => {
+    try {
+      // 1. Update Username if changed
       if (newUsername.trim()) {
         setUserName(newUsername);
+        localStorage.setItem('erp_username', newUsername);
       }
+
+      // 2. Update Password via Database API Route
+      if (newPassword) {
+        if (newPassword.length < 3) {
+          setIsSaving(false);
+          setProfileMessage({ type: 'error', text: 'New password must be at least 3 characters long!' });
+          return;
+        }
+
+        const res = await fetch('/api/v1/auth/update-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ currentPassword, newPassword }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+          setIsSaving(false);
+          setProfileMessage({ type: 'error', text: data.error || 'Failed to update password in database' });
+          return;
+        }
+
+        setCurrentPassword('');
+        setNewPassword('');
+      }
+
       setIsSaving(false);
-      setProfileMessage({ type: 'success', text: 'Profile updated successfully!' });
+      setProfileMessage({ type: 'success', text: 'Profile & Database Password successfully updated!' });
       setTimeout(() => {
         setIsEditProfileOpen(false);
         setProfileMessage({ type: '', text: '' });
       }, 1500);
-    }, 800);
+
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      setIsSaving(false);
+      setProfileMessage({ type: 'error', text: 'An unexpected error occurred.' });
+    }
   };
 
   return (
@@ -165,7 +250,7 @@ export default function ExecutiveDashboardPage() {
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-blue-700 text-white font-bold text-xs flex items-center justify-center ring-2 ring-blue-600 shrink-0 shadow overflow-hidden relative">
                   {profilePic ? (
-                    <img src={profilePic} alt="Profile" className="w-full h-full object-cover" />
+                    <img src={profilePic} alt="Profile" className="w-full h-full object-cover object-center" />
                   ) : (
                     initials
                   )}
@@ -197,16 +282,36 @@ export default function ExecutiveDashboardPage() {
       {/* Main Container */}
       <main className="w-full px-4 sm:px-6 py-8 sm:py-12 flex-grow max-w-[1700px] mx-auto space-y-8">
         
-        {/* Command Banner */}
+        {/* Command Banner with Back & Next Buttons */}
         <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-6 sm:p-8 shadow-2xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative overflow-hidden">
-          <div className="space-y-2 relative z-10">
+          <div className="space-y-3 relative z-10 w-full">
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-xs uppercase tracking-wider rounded-xl transition cursor-pointer border border-slate-300 shadow-sm"
+              >
+                <ArrowLeft className="w-4 h-4" /> Back
+              </button>
+              <button
+                type="button"
+                onClick={() => router.forward()}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-xs uppercase tracking-wider rounded-xl transition cursor-pointer border border-slate-300 shadow-sm"
+              >
+                Next <ArrowRight className="w-4 h-4" />
+              </button>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-black uppercase tracking-wider font-mono">
+                <Activity className="w-3.5 h-3.5 text-blue-600" /> Executive Command Portal
+              </div>
+            </div>
+
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight">HASH Logistics Command Dashboard</h1>
             <p className="text-xs sm:text-sm text-slate-600 max-w-2xl leading-relaxed font-medium">
               Real-time monitoring of WebOC Customs Goods Declarations, IOCO Input-Output Reconciliation, stock balances, and financial ledgers.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 relative z-10 w-full lg:w-auto">
+          <div className="flex flex-wrap items-center gap-3 relative z-10 w-full lg:w-auto shrink-0">
             <Link
               href="/dashboard/imports"
               className="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md flex items-center justify-center gap-1.5 transition text-center"
@@ -239,7 +344,6 @@ export default function ExecutiveDashboardPage() {
 
         {/* Top Metrics Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-          {/* Card 1 */}
           <div className="bg-white border-2 border-slate-300 hover:border-blue-600 rounded-2xl p-6 sm:p-7 shadow-xl transition space-y-4 group">
             <div className="flex items-center justify-between">
               <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-600">Active Clients</span>
@@ -255,7 +359,6 @@ export default function ExecutiveDashboardPage() {
             </div>
           </div>
 
-          {/* Card 2 */}
           <div className="bg-white border-2 border-slate-300 hover:border-emerald-600 rounded-2xl p-6 sm:p-7 shadow-xl transition space-y-4 group">
             <div className="flex items-center justify-between">
               <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-600">Import GDs Cleared</span>
@@ -269,7 +372,6 @@ export default function ExecutiveDashboardPage() {
             </div>
           </div>
 
-          {/* Card 3 */}
           <div className="bg-white border-2 border-slate-300 hover:border-purple-600 rounded-2xl p-6 sm:p-7 shadow-xl transition space-y-4 group">
             <div className="flex items-center justify-between">
               <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-600">Export Shipping Bills</span>
@@ -283,7 +385,6 @@ export default function ExecutiveDashboardPage() {
             </div>
           </div>
 
-          {/* Card 4 */}
           <div className="bg-white border-2 border-slate-300 hover:border-amber-600 rounded-2xl p-6 sm:p-7 shadow-xl transition space-y-4 group">
             <div className="flex items-center justify-between">
               <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-600">Total Analysis Certificates</span>
@@ -302,7 +403,6 @@ export default function ExecutiveDashboardPage() {
 
         {/* Lower Engines Section */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* 1. Raw Material Stock Engine */}
           <Link 
             href="/dashboard/imports"
             className="bg-white border-2 border-slate-300 hover:border-emerald-600 rounded-2xl p-6 sm:p-7 shadow-xl flex flex-col justify-between transition cursor-pointer group space-y-5"
@@ -328,7 +428,6 @@ export default function ExecutiveDashboardPage() {
             </div>
           </Link>
 
-          {/* 2. Export Shipping Bills Engine */}
           <Link 
             href="/dashboard/exports"
             className="bg-white border-2 border-slate-300 hover:border-purple-600 rounded-2xl p-6 sm:p-7 shadow-xl flex flex-col justify-between transition cursor-pointer group space-y-5"
@@ -354,7 +453,6 @@ export default function ExecutiveDashboardPage() {
             </div>
           </Link>
 
-          {/* 3. Analysis Certificate Manager */}
           <Link 
             href="/dashboard/analysis"
             className="bg-white border-2 border-slate-300 hover:border-amber-600 rounded-2xl p-6 sm:p-7 shadow-xl flex flex-col justify-between transition cursor-pointer group space-y-5"
@@ -380,7 +478,6 @@ export default function ExecutiveDashboardPage() {
             </div>
           </Link>
 
-          {/* 4. IOR Audit Engine */}
           <Link 
             href="/dashboard/reconciliation"
             className="bg-white border-2 border-slate-300 hover:border-blue-600 rounded-2xl p-6 sm:p-7 shadow-xl flex flex-col justify-between transition cursor-pointer group space-y-5"
@@ -445,11 +542,11 @@ export default function ExecutiveDashboardPage() {
             )}
 
             <form onSubmit={handleUpdateProfile} className="space-y-5">
-              {/* Profile Picture Upload */}
+              {/* Profile Picture Upload with Square/Cropped Preview Box */}
               <div className="flex items-center gap-5">
                 <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-blue-700 to-indigo-600 text-white font-black text-2xl flex items-center justify-center ring-4 ring-slate-100 shadow-xl overflow-hidden relative group">
                   {profilePic ? (
-                    <img src={profilePic} alt="Profile" className="w-full h-full object-cover" />
+                    <img src={profilePic} alt="Profile" className="w-full h-full object-cover object-center" />
                   ) : (
                     initials
                   )}
@@ -460,7 +557,7 @@ export default function ExecutiveDashboardPage() {
                 </div>
                 <div className="space-y-1">
                   <h4 className="text-sm font-black text-slate-900">Profile Picture</h4>
-                  <p className="text-xs text-slate-500 font-medium">Click on avatar to browse and upload a new photo (PNG, JPG).</p>
+                  <p className="text-xs text-slate-500 font-medium">Click on avatar to browse and upload a new photo. Auto-compressed &amp; permanently saved.</p>
                 </div>
               </div>
 
@@ -492,12 +589,20 @@ export default function ExecutiveDashboardPage() {
                       <KeyRound className="w-4 h-4" />
                     </div>
                     <input
-                      type="password"
+                      type={showCurrentPassword ? 'text' : 'password'}
                       value={currentPassword}
                       onChange={(e) => setCurrentPassword(e.target.value)}
                       placeholder="••••••••••••"
-                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border-2 border-slate-200 focus:border-blue-600 focus:bg-white rounded-xl text-sm font-bold text-slate-900 outline-none transition"
+                      className="w-full pl-11 pr-12 py-3 bg-slate-50 border-2 border-slate-200 focus:border-blue-600 focus:bg-white rounded-xl text-sm font-bold text-slate-900 outline-none transition"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-700 transition cursor-pointer"
+                      title={showCurrentPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
 
@@ -508,12 +613,20 @@ export default function ExecutiveDashboardPage() {
                       <KeyRound className="w-4 h-4" />
                     </div>
                     <input
-                      type="password"
+                      type={showNewPassword ? 'text' : 'password'}
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="••••••••••••"
-                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border-2 border-slate-200 focus:border-blue-600 focus:bg-white rounded-xl text-sm font-bold text-slate-900 outline-none transition"
+                      placeholder="Enter new password"
+                      className="w-full pl-11 pr-12 py-3 bg-slate-50 border-2 border-slate-200 focus:border-blue-600 focus:bg-white rounded-xl text-sm font-bold text-slate-900 outline-none transition"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-700 transition cursor-pointer"
+                      title={showNewPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -530,7 +643,7 @@ export default function ExecutiveDashboardPage() {
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-blue-600/30 transition cursor-pointer flex items-center gap-2"
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg transition cursor-pointer flex items-center gap-2"
                 >
                   {isSaving ? 'Saving...' : 'Save Changes'}
                 </button>
