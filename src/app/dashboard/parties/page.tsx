@@ -13,8 +13,12 @@ import {
   FileText,
   Download,
   Users,
-  RefreshCw
+  RefreshCw,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUpRight
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface Party {
   id: string;
@@ -26,6 +30,7 @@ interface Party {
 }
 
 export default function PartiesPage() {
+  const router = useRouter();
   const [parties, setParties] = useState<Party[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -267,12 +272,28 @@ export default function PartiesPage() {
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
       `}</style>
 
-      {/* Top Banner Header with Blue Gradient Theme */}
+      {/* Top Banner Header with Blue Gradient Theme, Back & Next Buttons */}
       <div className="bg-white border-2 border-slate-300 rounded-2xl shadow-xl overflow-hidden">
         <div className="bg-gradient-to-r from-blue-700 via-blue-900 to-slate-950 p-8 text-white flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/10 border border-white/20 text-blue-100 text-xs font-black uppercase tracking-wider">
-              <Users className="w-4 h-4 text-cyan-400" /> Master Data Directory &bull; Client Parties
+            <div className="flex items-center gap-3 mb-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white font-black text-xs sm:text-sm uppercase tracking-wider rounded-xl transition cursor-pointer border border-white/20 shadow-sm"
+              >
+                <ArrowLeft className="w-4 h-4" /> Back
+              </button>
+              <button
+                type="button"
+                onClick={() => router.forward()}
+                className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white font-black text-xs sm:text-sm uppercase tracking-wider rounded-xl transition cursor-pointer border border-white/20 shadow-sm"
+              >
+                Next <ArrowRight className="w-4 h-4" />
+              </button>
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/10 border border-white/20 text-blue-100 text-xs font-black uppercase tracking-wider">
+                <Users className="w-4 h-4 text-cyan-400" /> Master Data Directory &bull; Client Parties
+              </div>
             </div>
             <h1 className="text-3xl lg:text-4xl font-black tracking-tight text-white">EFS Authorized Client Parties</h1>
             <p className="text-sm text-blue-200 font-medium max-w-2xl">

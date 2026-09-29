@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { FileSpreadsheet, CheckCircle2, Filter, Search, Trash2, Printer, Plus, ShieldCheck } from 'lucide-react';
+import { FileSpreadsheet, CheckCircle2, Filter, Search, Trash2, Printer, Plus, ShieldCheck, ArrowLeft, ArrowRight, ArrowUpRight } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import * as XLSX from 'xlsx';
 
 interface CertItem {
@@ -16,6 +17,7 @@ interface CertItem {
 }
 
 export default function AnalysisCertificatePage() {
+  const router = useRouter();
   const [parties, setParties] = useState<any[]>([]);
   const [certificates, setCertificates] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -282,12 +284,28 @@ export default function AnalysisCertificatePage() {
         }
       `}</style>
 
-      {/* Top Banner Header with Blue Gradient Theme */}
+      {/* Top Banner Header with Blue Gradient Theme, Back & Next Buttons */}
       <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl shadow-xl overflow-hidden no-print">
         <div className="bg-gradient-to-r from-blue-700 via-blue-900 to-slate-950 p-5 sm:p-8 text-white flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 sm:gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-blue-100 text-xs sm:text-sm font-black uppercase tracking-wider">
-              <ShieldCheck className="w-4 h-4 text-cyan-400" /> EFS Compliance &bull; IOCO Engine
+            <div className="flex items-center gap-3 mb-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white font-black text-xs sm:text-sm uppercase tracking-wider rounded-xl transition cursor-pointer border border-white/20 shadow-sm"
+              >
+                <ArrowLeft className="w-4 h-4" /> Back
+              </button>
+              <button
+                type="button"
+                onClick={() => router.forward()}
+                className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white font-black text-xs sm:text-sm uppercase tracking-wider rounded-xl transition cursor-pointer border border-white/20 shadow-sm"
+              >
+                Next <ArrowRight className="w-4 h-4" />
+              </button>
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20 text-blue-100 text-xs sm:text-sm font-black uppercase tracking-wider">
+                <ShieldCheck className="w-4 h-4 text-cyan-400" /> EFS Compliance &bull; IOCO Engine
+              </div>
             </div>
             <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-tight">Analysis Certificate Manager</h1>
             <p className="text-sm sm:text-base text-blue-200 font-medium max-w-2xl">
