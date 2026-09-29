@@ -279,65 +279,68 @@ export default function ExecutiveDashboardPage() {
         </div>
       </header>
 
-      {/* Main Container with Perfect Flex & Margin Alignment */}
+      {/* Main Container */}
       <main className="w-full px-6 lg:px-10 py-8 flex-grow space-y-8 max-w-[1600px] mx-auto">
         
-        {/* Command Banner with Back & Next Buttons */}
-        <div className="bg-white border-2 border-slate-300 rounded-3xl p-6 sm:p-10 shadow-xl flex flex-col xl:flex-row items-start xl:items-center justify-between gap-8 relative overflow-hidden">
-          <div className="space-y-4 relative z-10 w-full xl:w-6/12">
-            <div className="flex items-center gap-3 flex-wrap">
-              <button
-                type="button"
-                onClick={() => router.back()}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-xs uppercase tracking-wider rounded-xl transition cursor-pointer border border-slate-300 shadow-sm"
-              >
-                <ArrowLeft className="w-4 h-4" /> Back
-              </button>
-              <button
-                type="button"
-                onClick={() => router.forward()}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-xs uppercase tracking-wider rounded-xl transition cursor-pointer border border-slate-300 shadow-sm"
-              >
-                Next <ArrowRight className="w-4 h-4" />
-              </button>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-black uppercase tracking-wider font-mono">
-                <Activity className="w-3.5 h-3.5 text-blue-600" /> Executive Command Portal
+        {/* Command Banner - Clean Stacked Layout for Perfect Balance */}
+        <div className="bg-white border-2 border-slate-300 rounded-3xl p-6 sm:p-10 shadow-xl space-y-6 relative overflow-hidden">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => router.back()}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-xs uppercase tracking-wider rounded-xl transition cursor-pointer border border-slate-300 shadow-sm"
+                >
+                  <ArrowLeft className="w-4 h-4" /> Back
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.forward()}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-xs uppercase tracking-wider rounded-xl transition cursor-pointer border border-slate-300 shadow-sm"
+                >
+                  Next <ArrowRight className="w-4 h-4" />
+                </button>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-black uppercase tracking-wider font-mono">
+                  <Activity className="w-3.5 h-3.5 text-blue-600" /> Executive Command Portal
+                </div>
               </div>
-            </div>
 
-            <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">HASH Logistics Command Dashboard</h1>
-            <p className="text-sm text-slate-600 leading-relaxed font-medium">
-              Real-time monitoring of WebOC Customs Goods Declarations, IOCO Input-Output Reconciliation, stock balances, and financial ledgers.
-            </p>
+              <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">HASH Logistics Command Dashboard</h1>
+              <p className="text-sm text-slate-600 max-w-3xl leading-relaxed font-medium">
+                Real-time monitoring of WebOC Customs Goods Declarations, IOCO Input-Output Reconciliation, stock balances, and financial ledgers.
+              </p>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 relative z-10 w-full xl:w-auto shrink-0">
+          {/* Bottom Action Buttons Row inside Banner with Generous Spacing */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-slate-200">
             <Link
               href="/dashboard/imports"
-              className="px-5 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 transition text-center"
+              className="px-4 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-md flex items-center justify-center gap-2 transition text-center"
             >
-              <PlusCircle className="w-4 h-4" /> Register Import GD
+              <PlusCircle className="w-4 h-4 shrink-0" /> Register Import GD
             </Link>
 
             <Link
               href="/dashboard/exports"
-              className="px-5 py-3.5 bg-purple-600 hover:bg-purple-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-purple-600/20 flex items-center justify-center gap-2 transition text-center"
+              className="px-4 py-3.5 bg-purple-600 hover:bg-purple-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-md flex items-center justify-center gap-2 transition text-center"
             >
-              <PlusCircle className="w-4 h-4" /> Register Export GD
+              <PlusCircle className="w-4 h-4 shrink-0" /> Register Export GD
             </Link>
 
             <Link
               href="/dashboard/analysis"
-              className="px-5 py-3.5 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2 transition text-center"
+              className="px-4 py-3.5 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-md flex items-center justify-center gap-2 transition text-center"
             >
-              <PlusCircle className="w-4 h-4" /> Register Analysis Certificate
+              <PlusCircle className="w-4 h-4 shrink-0" /> Register Analysis Certificate
             </Link>
 
             <Link
               href="/dashboard/reconciliation"
-              className="px-5 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2 transition text-center"
+              className="px-4 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-md flex items-center justify-center gap-2 transition text-center"
             >
-              <Zap className="w-4 h-4" /> Run IOR Engine
+              <Zap className="w-4 h-4 shrink-0" /> Run IOR Engine
             </Link>
           </div>
         </div>
@@ -514,7 +517,7 @@ export default function ExecutiveDashboardPage() {
       {/* Edit Profile Modal */}
       {isEditProfileOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border-2 border-slate-900 rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl space-y-6 relative animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl space-y-6 relative animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-200 pb-4">
               <div className="flex items-center gap-3">
                 <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl border border-blue-200">
