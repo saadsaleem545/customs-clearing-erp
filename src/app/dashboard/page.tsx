@@ -209,7 +209,7 @@ export default function ExecutiveDashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col justify-between relative overflow-x-hidden">
+    <div className="min-h-screen bg-slate-100 text-slate-900 font-sans flex flex-col justify-between w-full overflow-x-hidden">
       <style jsx global>{`
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
@@ -219,7 +219,7 @@ export default function ExecutiveDashboardPage() {
 
       {/* Top Full Width Header with User Profile Box & Sync Hub */}
       <header className="bg-gradient-to-r from-blue-700 via-blue-900 to-slate-950 text-white shadow-xl border-b border-blue-900 w-full z-25">
-        <div className="w-full px-4 sm:px-8 py-4 flex flex-col lg:flex-row items-center justify-between gap-4 max-w-[1700px] mx-auto">
+        <div className="w-full px-6 lg:px-10 py-4 flex flex-col lg:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <span className="text-2xl sm:text-3xl font-black tracking-wider text-white">
               HASH <span className="text-xs font-mono uppercase bg-blue-600 text-white px-2.5 py-1 rounded shadow-sm">ERP</span>
@@ -279,12 +279,12 @@ export default function ExecutiveDashboardPage() {
         </div>
       </header>
 
-      {/* Main Container */}
-      <main className="w-full px-4 sm:px-6 py-8 sm:py-12 flex-grow max-w-[1700px] mx-auto space-y-8">
+      {/* Main Container with Perfect Flex & Margin Alignment */}
+      <main className="w-full px-6 lg:px-10 py-8 flex-grow space-y-8 max-w-[1600px] mx-auto">
         
         {/* Command Banner with Back & Next Buttons */}
-        <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-6 sm:p-8 shadow-2xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative overflow-hidden">
-          <div className="space-y-3 relative z-10 w-full">
+        <div className="bg-white border-2 border-slate-300 rounded-3xl p-6 sm:p-10 shadow-xl flex flex-col xl:flex-row items-start xl:items-center justify-between gap-8 relative overflow-hidden">
+          <div className="space-y-4 relative z-10 w-full xl:w-6/12">
             <div className="flex items-center gap-3 flex-wrap">
               <button
                 type="button"
@@ -305,37 +305,37 @@ export default function ExecutiveDashboardPage() {
               </div>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight">HASH Logistics Command Dashboard</h1>
-            <p className="text-xs sm:text-sm text-slate-600 max-w-2xl leading-relaxed font-medium">
+            <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">HASH Logistics Command Dashboard</h1>
+            <p className="text-sm text-slate-600 leading-relaxed font-medium">
               Real-time monitoring of WebOC Customs Goods Declarations, IOCO Input-Output Reconciliation, stock balances, and financial ledgers.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 relative z-10 w-full lg:w-auto shrink-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 relative z-10 w-full xl:w-auto shrink-0">
             <Link
               href="/dashboard/imports"
-              className="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md flex items-center justify-center gap-1.5 transition text-center"
+              className="px-5 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 transition text-center"
             >
               <PlusCircle className="w-4 h-4" /> Register Import GD
             </Link>
 
             <Link
               href="/dashboard/exports"
-              className="flex-1 sm:flex-none px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md flex items-center justify-center gap-1.5 transition text-center"
+              className="px-5 py-3.5 bg-purple-600 hover:bg-purple-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-purple-600/20 flex items-center justify-center gap-2 transition text-center"
             >
               <PlusCircle className="w-4 h-4" /> Register Export GD
             </Link>
 
             <Link
               href="/dashboard/analysis"
-              className="flex-1 sm:flex-none px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md flex items-center justify-center gap-1.5 transition text-center"
+              className="px-5 py-3.5 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2 transition text-center"
             >
               <PlusCircle className="w-4 h-4" /> Register Analysis Certificate
             </Link>
 
             <Link
               href="/dashboard/reconciliation"
-              className="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md flex items-center justify-center gap-1.5 transition text-center"
+              className="px-5 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2 transition text-center"
             >
               <Zap className="w-4 h-4" /> Run IOR Engine
             </Link>
@@ -344,10 +344,10 @@ export default function ExecutiveDashboardPage() {
 
         {/* Top Metrics Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-          <div className="bg-white border-2 border-slate-300 hover:border-blue-600 rounded-2xl p-6 sm:p-7 shadow-xl transition space-y-4 group">
+          <div className="bg-white border-2 border-slate-200 hover:border-blue-600 rounded-3xl p-6 sm:p-7 shadow-lg transition space-y-4 group">
             <div className="flex items-center justify-between">
-              <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-600">Active Clients</span>
-              <div className="p-3 bg-blue-50 text-blue-600 rounded-xl border border-blue-200">
+              <span className="text-xs font-black uppercase tracking-wider text-slate-500">Active Clients</span>
+              <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl border border-blue-100">
                 <Users className="w-6 h-6" />
               </div>
             </div>
@@ -359,36 +359,36 @@ export default function ExecutiveDashboardPage() {
             </div>
           </div>
 
-          <div className="bg-white border-2 border-slate-300 hover:border-emerald-600 rounded-2xl p-6 sm:p-7 shadow-xl transition space-y-4 group">
+          <div className="bg-white border-2 border-slate-200 hover:border-emerald-600 rounded-3xl p-6 sm:p-7 shadow-lg transition space-y-4 group">
             <div className="flex items-center justify-between">
-              <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-600">Import GDs Cleared</span>
-              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-200">
+              <span className="text-xs font-black uppercase tracking-wider text-slate-500">Import GDs Cleared</span>
+              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100">
                 <FileSpreadsheet className="w-6 h-6" />
               </div>
             </div>
             <div className="space-y-1.5">
               <div className="text-4xl sm:text-5xl font-black text-slate-900 font-mono">{stats.importGds}</div>
-              <p className="text-xs font-bold text-slate-700">Bills of Entry Registered &amp; Assessed</p>
+              <p className="text-xs font-bold text-slate-600">Bills of Entry Registered &amp; Assessed</p>
             </div>
           </div>
 
-          <div className="bg-white border-2 border-slate-300 hover:border-purple-600 rounded-2xl p-6 sm:p-7 shadow-xl transition space-y-4 group">
+          <div className="bg-white border-2 border-slate-200 hover:border-purple-600 rounded-3xl p-6 sm:p-7 shadow-lg transition space-y-4 group">
             <div className="flex items-center justify-between">
-              <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-600">Export Shipping Bills</span>
-              <div className="p-3 bg-purple-50 text-purple-600 rounded-xl border border-purple-200">
+              <span className="text-xs font-black uppercase tracking-wider text-slate-500">Export Shipping Bills</span>
+              <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl border border-purple-100">
                 <FileText className="w-6 h-6" />
               </div>
             </div>
             <div className="space-y-1.5">
               <div className="text-4xl sm:text-5xl font-black text-slate-900 font-mono">{stats.exportBills}</div>
-              <p className="text-xs font-bold text-slate-700">Form-E Filings Verified &amp; Cleared</p>
+              <p className="text-xs font-bold text-slate-600">Form-E Filings Verified &amp; Cleared</p>
             </div>
           </div>
 
-          <div className="bg-white border-2 border-slate-300 hover:border-amber-600 rounded-2xl p-6 sm:p-7 shadow-xl transition space-y-4 group">
+          <div className="bg-white border-2 border-slate-200 hover:border-amber-600 rounded-3xl p-6 sm:p-7 shadow-lg transition space-y-4 group">
             <div className="flex items-center justify-between">
-              <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-600">Total Analysis Certificates</span>
-              <div className="p-3 bg-amber-50 text-amber-600 rounded-xl border border-amber-200">
+              <span className="text-xs font-black uppercase tracking-wider text-slate-500">Total Analysis Certificates</span>
+              <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl border border-amber-100">
                 <FileText className="w-6 h-6" />
               </div>
             </div>
@@ -396,7 +396,7 @@ export default function ExecutiveDashboardPage() {
               <div className="text-4xl sm:text-5xl font-black text-slate-900 font-mono tracking-tight">
                 {stats.totalAnalysisCerts}
               </div>
-              <p className="text-xs font-bold text-slate-700">Verified IOCO Certificates Issued</p>
+              <p className="text-xs font-bold text-slate-600">Verified IOCO Certificates Issued</p>
             </div>
           </div>
         </div>
@@ -405,14 +405,14 @@ export default function ExecutiveDashboardPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <Link 
             href="/dashboard/imports"
-            className="bg-white border-2 border-slate-300 hover:border-emerald-600 rounded-2xl p-6 sm:p-7 shadow-xl flex flex-col justify-between transition cursor-pointer group space-y-5"
+            className="bg-white border-2 border-slate-200 hover:border-emerald-600 rounded-3xl p-6 sm:p-7 shadow-lg flex flex-col justify-between transition cursor-pointer group space-y-5"
           >
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-200">
+                <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100">
                   <Database className="w-6 h-6" />
                 </div>
-                <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 inline-flex items-center gap-1">
+                <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100 inline-flex items-center gap-1">
                   View <ArrowUpRight className="w-3.5 h-3.5" />
                 </span>
               </div>
@@ -422,7 +422,7 @@ export default function ExecutiveDashboardPage() {
               </div>
             </div>
             <div className="border-t border-slate-100 pt-4">
-              <p className="text-sm text-slate-700 font-medium leading-relaxed">
+              <p className="text-xs text-slate-600 font-medium leading-relaxed">
                 Real-time inventory levels, FIFO tracking, and registered raw input ledgers.
               </p>
             </div>
@@ -430,14 +430,14 @@ export default function ExecutiveDashboardPage() {
 
           <Link 
             href="/dashboard/exports"
-            className="bg-white border-2 border-slate-300 hover:border-purple-600 rounded-2xl p-6 sm:p-7 shadow-xl flex flex-col justify-between transition cursor-pointer group space-y-5"
+            className="bg-white border-2 border-slate-200 hover:border-purple-600 rounded-3xl p-6 sm:p-7 shadow-lg flex flex-col justify-between transition cursor-pointer group space-y-5"
           >
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <div className="p-3 bg-purple-50 text-purple-600 rounded-xl border border-purple-200">
+                <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl border border-purple-100">
                   <PackageCheck className="w-6 h-6" />
                 </div>
-                <span className="text-xs font-black text-purple-700 bg-purple-50 px-3 py-1.5 rounded-xl border border-purple-200 inline-flex items-center gap-1">
+                <span className="text-xs font-black text-purple-700 bg-purple-50 px-3 py-1.5 rounded-xl border border-purple-100 inline-flex items-center gap-1">
                   View <ArrowUpRight className="w-3.5 h-3.5" />
                 </span>
               </div>
@@ -447,7 +447,7 @@ export default function ExecutiveDashboardPage() {
               </div>
             </div>
             <div className="border-t border-slate-100 pt-4">
-              <p className="text-sm text-slate-700 font-medium leading-relaxed">
+              <p className="text-xs text-slate-600 font-medium leading-relaxed">
                 Track processed customs export declarations, Form-E clearances, and shipments.
               </p>
             </div>
@@ -455,14 +455,14 @@ export default function ExecutiveDashboardPage() {
 
           <Link 
             href="/dashboard/analysis"
-            className="bg-white border-2 border-slate-300 hover:border-amber-600 rounded-2xl p-6 sm:p-7 shadow-xl flex flex-col justify-between transition cursor-pointer group space-y-5"
+            className="bg-white border-2 border-slate-200 hover:border-amber-600 rounded-3xl p-6 sm:p-7 shadow-lg flex flex-col justify-between transition cursor-pointer group space-y-5"
           >
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <div className="p-3 bg-amber-50 text-amber-600 rounded-xl border border-amber-200">
+                <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl border border-amber-100">
                   <FileCheck2 className="w-6 h-6" />
                 </div>
-                <span className="text-xs font-black text-amber-700 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 inline-flex items-center gap-1">
+                <span className="text-xs font-black text-amber-700 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-100 inline-flex items-center gap-1">
                   View <ArrowUpRight className="w-3.5 h-3.5" />
                 </span>
               </div>
@@ -472,7 +472,7 @@ export default function ExecutiveDashboardPage() {
               </div>
             </div>
             <div className="border-t border-slate-100 pt-4">
-              <p className="text-sm text-slate-700 font-medium leading-relaxed">
+              <p className="text-xs text-slate-600 font-medium leading-relaxed">
                 Manage issued IOCO certificates, wastage allowances, and approved ratios.
               </p>
             </div>
@@ -480,14 +480,14 @@ export default function ExecutiveDashboardPage() {
 
           <Link 
             href="/dashboard/reconciliation"
-            className="bg-white border-2 border-slate-300 hover:border-blue-600 rounded-2xl p-6 sm:p-7 shadow-xl flex flex-col justify-between transition cursor-pointer group space-y-5"
+            className="bg-white border-2 border-slate-200 hover:border-blue-600 rounded-3xl p-6 sm:p-7 shadow-lg flex flex-col justify-between transition cursor-pointer group space-y-5"
           >
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <div className="p-3 bg-blue-50 text-blue-600 rounded-xl border border-blue-200">
+                <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl border border-blue-100">
                   <Scale className="w-6 h-6" />
                 </div>
-                <span className="text-xs font-black text-blue-700 bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-200 inline-flex items-center gap-1">
+                <span className="text-xs font-black text-blue-700 bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-100 inline-flex items-center gap-1">
                   Open <ArrowUpRight className="w-3.5 h-3.5" />
                 </span>
               </div>
@@ -497,7 +497,7 @@ export default function ExecutiveDashboardPage() {
               </div>
             </div>
             <div className="border-t border-slate-100 pt-4">
-              <p className="text-sm text-slate-700 font-medium leading-relaxed">
+              <p className="text-xs text-slate-600 font-medium leading-relaxed">
                 Run comprehensive input-output reconciliations, audits, and compliance ledgers.
               </p>
             </div>
@@ -514,7 +514,7 @@ export default function ExecutiveDashboardPage() {
       {/* Edit Profile Modal */}
       {isEditProfileOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl space-y-6 relative animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border-2 border-slate-900 rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl space-y-6 relative animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-200 pb-4">
               <div className="flex items-center gap-3">
                 <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl border border-blue-200">
