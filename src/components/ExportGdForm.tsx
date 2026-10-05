@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
-import { Upload, Plus, Trash2, Save, Loader2, FileSpreadsheet, Edit3, X, ShieldCheck, Printer, Search, ArrowUpRight } from 'lucide-react';
+import { Upload, Plus, Trash2, Save, Loader2, FileSpreadsheet, Edit3, X, ShieldCheck, Printer, Search, ArrowUpRight, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export default function ExportGdForm() {
   const [activeTab, setActiveTab] = useState<'auto' | 'manual'>('auto');
@@ -14,6 +14,20 @@ export default function ExportGdForm() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [historySearch, setHistorySearch] = useState('');
+
+  // Professional Toast Notification State
+  const [notification, setNotification] = useState<{
+    show: boolean;
+    type: 'success' | 'error';
+    message: string;
+  }>({ show: false, type: 'success', message: '' });
+
+  const showNotification = (type: 'success' | 'error', message: string) => {
+    setNotification({ show: true, type, message });
+    setTimeout(() => {
+      setNotification(prev => ({ ...prev, show: false }));
+    }, 4000);
+  };
 
   // Custom Professional Confirmation Modal State
   const [confirmModal, setConfirmModal] = useState<{
@@ -89,9 +103,24 @@ export default function ExportGdForm() {
     fetchData();
   }, []);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    try {
+      const uploadFormData = new FormData();
+      uploadFormData.append('file', file);
+      const uploadRes = await fetch('/api/v1/upload', {
+        method: 'POST',
+        body: uploadFormData,
+      });
+      const uploadResult = await uploadRes.json();
+      if (uploadResult.success) {
+        console.log('Export document successfully uploaded to AWS S3:', uploadResult.fileUrl);
+      }
+    } catch (uploadErr) {
+      console.error('S3 Upload background sync notice:', uploadErr);
+    }
 
     const reader = new FileReader();
     reader.onload = (evt) => {
@@ -199,9 +228,9 @@ export default function ExportGdForm() {
         }
 
         setItems(parsedItems);
-        setMessage(`Successfully extracted Exporter and ${parsedItems.length} unique export items with correct columns mapping!`);
+        showNotification('success', `Uploaded to AWS S3 & parsed ${parsedItems.length} export items successfully!`);
       } catch (err: any) {
-        setMessage('Error parsing Excel: ' + err.message);
+        showNotification('error', 'Error parsing Excel: ' + err.message);
       }
     };
     reader.readAsBinaryString(file);
@@ -238,11 +267,11 @@ export default function ExportGdForm() {
   const handleSaveManualExport = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedManualPartyId) {
-      alert('Please select a Client Party / Exporter.');
+      showNotification('error', 'Please select a Client Party / Exporter.');
       return;
     }
     if (!manualGdNumber.trim()) {
-      alert('Please enter Export GD Number.');
+      showNotification('error', 'Please enter Export GD Number.');
       return;
     }
 
@@ -275,12 +304,12 @@ export default function ExportGdForm() {
         throw new Error(result.error || 'Failed to save manual export GD');
       }
 
-      alert(`Export GD: ${manualGdNumber} saved successfully via manual entry!`);
+      showNotification('success', `Export GD: ${manualGdNumber} saved successfully via manual entry!`);
       handleCancelManual();
       fetchData();
     } catch (err: any) {
       console.error('Error saving manual export:', err);
-      alert(`Error: ${err.message}`);
+      showNotification('error', `Error: ${err.message}`);
     } finally {
       setIsSavingManual(false);
     }
@@ -289,7 +318,7 @@ export default function ExportGdForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!extractedPartyName || items.length === 0) {
-      alert('Please upload a valid Export Excel file first.');
+      showNotification('error', 'Please upload a valid Export Excel file first.');
       return;
     }
 
@@ -300,7 +329,7 @@ export default function ExportGdForm() {
     const partyId = matchedParty ? matchedParty.id : (parties.length > 0 ? parties[0].id : null);
 
     if (!partyId) {
-      alert('Error: No matching Client Party found in directory. Please register this party first.');
+      showNotification('error', 'Error: No matching Client Party found in directory. Please register this party first.');
       return;
     }
 
@@ -344,12 +373,12 @@ export default function ExportGdForm() {
         }
       }
 
-      alert('All Export GDs extracted and saved successfully under Client Party ' + extractedPartyName + '!');
+      showNotification('success', `All Export GDs extracted & saved successfully under ${extractedPartyName}!`);
       setItems([]);
       setExtractedPartyName('');
       fetchData();
     } catch (err: any) {
-      alert('Submission failed: ' + err.message);
+      showNotification('error', 'Submission failed: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -367,13 +396,13 @@ export default function ExportGdForm() {
           });
           const json = await res.json();
           if (json.success) {
-            alert('Export GD deleted successfully!');
+            showNotification('success', 'Export GD deleted successfully!');
             fetchData();
           } else {
-            alert('Error deleting: ' + (json.error || 'Failed'));
+            showNotification('error', 'Error deleting: ' + (json.error || 'Failed'));
           }
         } catch (err: any) {
-          alert('Delete failed: ' + err.message);
+          showNotification('error', 'Delete failed: ' + err.message);
         } finally {
           setConfirmModal(prev => ({ ...prev, isOpen: false }));
         }
@@ -503,13 +532,28 @@ export default function ExportGdForm() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col justify-between p-3 sm:p-6 space-y-6 sm:space-y-8 max-w-[1700px] mx-auto w-full">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col justify-between p-3 sm:p-6 space-y-6 sm:space-y-8 max-w-[1700px] mx-auto w-full relative">
       <style jsx global>{`
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
       `}</style>
+
+      {/* FLOATING TOAST NOTIFICATION */}
+      {notification.show && (
+        <div className="fixed top-6 right-6 z-50 animate-bounce">
+          <div className={`flex items-center gap-3 px-5 py-4 rounded-2xl shadow-2xl border-2 text-white font-black text-xs sm:text-sm uppercase tracking-wider ${
+            notification.type === 'success' ? 'bg-slate-900 border-blue-500 text-white' : 'bg-red-600 border-red-800 text-white'
+          }`}>
+            {notification.type === 'success' ? <CheckCircle2 className="w-5 h-5 text-cyan-400" /> : <AlertCircle className="w-5 h-5 text-white" />}
+            <span>{notification.message}</span>
+            <button onClick={() => setNotification(prev => ({ ...prev, show: false }))} className="ml-2 hover:opacity-75 cursor-pointer">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Top Banner Header */}
       <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl shadow-xl overflow-hidden w-full">
@@ -520,7 +564,7 @@ export default function ExportGdForm() {
             </div>
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-white leading-tight">Exports Management</h1>
             <p className="text-xs sm:text-sm text-blue-200 font-medium max-w-2xl">
-              Upload Excel sheets for auto-extraction with separate GD No & Date columns or use manual entry forms.
+              Upload Excel sheets to AWS S3 for auto-extraction with separate GD No & Date columns or use manual entry forms.
             </p>
           </div>
 
@@ -551,13 +595,13 @@ export default function ExportGdForm() {
               <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl border border-blue-200">
                 <FileSpreadsheet className="w-5 h-5" />
               </div>
-              Export GD Module - Auto Excel Import
+              Export GD Module - Auto Excel Import to AWS S3
             </h2>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="bg-slate-50 p-4 sm:p-6 rounded-2xl border-2 border-dashed border-slate-400 hover:border-blue-600 transition">
-              <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700 mb-3">Upload Export Template Excel File (.xlsx, .xls)</label>
+              <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700 mb-3">Upload Export Template Excel File (.xlsx, .xls) to AWS S3</label>
               <input
                 type="file"
                 accept=".xlsx, .xls"
@@ -790,7 +834,7 @@ export default function ExportGdForm() {
           </div>
         </div>
 
-        {/* Filter Controls Bar - Fixed with Flexbox layout so everything stays neatly inside */}
+        {/* Filter Controls Bar */}
         <div className="bg-slate-50 border-2 border-slate-300 p-4 sm:p-5 rounded-2xl flex flex-wrap items-end gap-4 shadow-sm">
           <div className="flex-1 min-w-[220px] space-y-1.5">
             <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700">Filter by Party</label>

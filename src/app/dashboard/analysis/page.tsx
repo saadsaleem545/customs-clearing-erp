@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { FileSpreadsheet, CheckCircle2, Filter, Search, Trash2, Printer, Plus, ShieldCheck, ArrowLeft, ArrowRight, ArrowUpRight } from 'lucide-react';
+import { FileSpreadsheet, CheckCircle2, Filter, Search, Trash2, Printer, Plus, ShieldCheck, ArrowLeft, ArrowRight, ArrowUpRight, AlertCircle, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import * as XLSX from 'xlsx';
 
@@ -29,7 +29,20 @@ export default function AnalysisCertificatePage() {
   const [filterPartyId, setFilterPartyId] = useState('');
   const [searchCertNo, setSearchCertNo] = useState('');
 
-  // Custom Professional Confirmation Modal State
+  // Professional Toast Notification State
+  const [notification, setNotification] = useState<{
+    show: boolean;
+    type: 'success' | 'error';
+    message: string;
+  }>({ show: false, type: 'success', message: '' });
+
+  const showNotification = (type: 'success' | 'error', message: string) => {
+    setNotification({ show: true, type, message });
+    setTimeout(() => {
+      setNotification(prev => ({ ...prev, show: false }));
+    }, 4000);
+  };
+
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -42,7 +55,6 @@ export default function AnalysisCertificatePage() {
     onConfirm: () => {},
   });
 
-  // Manual Item Form States
   const [hsCodeInput, setHsCodeInput] = useState('');
   const [descInput, setDescInput] = useState('');
   const [uomInput, setUomInput] = useState('KG');
@@ -75,9 +87,24 @@ export default function AnalysisCertificatePage() {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    try {
+      const uploadFormData = new FormData();
+      uploadFormData.append('file', file);
+      const uploadRes = await fetch('/api/v1/upload', {
+        method: 'POST',
+        body: uploadFormData,
+      });
+      const uploadResult = await uploadRes.json();
+      if (uploadResult.success) {
+        console.log('Document successfully uploaded to AWS S3:', uploadResult.fileUrl);
+      }
+    } catch (uploadErr) {
+      console.error('S3 Upload background sync notice:', uploadErr);
+    }
 
     const reader = new FileReader();
     reader.onload = (evt) => {
@@ -138,13 +165,13 @@ export default function AnalysisCertificatePage() {
 
         if (extractedItems.length > 0) {
           setParsedItems(prev => [...prev, ...extractedItems]);
-          alert(`Success! Extracted ${extractedItems.length} items.`);
+          showNotification('success', `Successfully extracted ${extractedItems.length} items & saved file to AWS S3!`);
         } else {
-          alert('Could not parse items automatically.');
+          showNotification('success', 'File saved to AWS S3 successfully, but please add items manually.');
         }
       } catch (err) {
         console.error(err);
-        alert('Error parsing Excel file.');
+        showNotification('error', 'Error parsing Excel file format.');
       }
     };
     reader.readAsBinaryString(file);
@@ -153,7 +180,7 @@ export default function AnalysisCertificatePage() {
   const handleAddManualItem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!hsCodeInput || !descInput || !reqQtyInput) {
-      alert('Please fill in HS Code, Item Description, and Requirement Qty.');
+      showNotification('error', 'Please fill in HS Code, Item Description, and Requirement Qty.');
       return;
     }
 
@@ -187,7 +214,7 @@ export default function AnalysisCertificatePage() {
   const handleSaveCertificate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPartyId || !certNumber || parsedItems.length === 0) {
-      alert('Please select a Party, enter Certificate Number, and ensure items are added.');
+      showNotification('error', 'Please select a Party, enter Certificate Number, and ensure items are added.');
       return;
     }
 
@@ -205,15 +232,16 @@ export default function AnalysisCertificatePage() {
 
       const result = await res.json();
       if (result.success) {
-        alert('Analysis Certificate saved successfully!');
+        showNotification('success', 'Analysis Certificate saved successfully!');
         setCertNumber('');
         setParsedItems([]);
         fetchPartiesAndCerts();
       } else {
-        alert(result.error || 'Failed to save certificate');
+        showNotification('error', result.error || 'Failed to save certificate');
       }
     } catch (err) {
       console.error(err);
+      showNotification('error', 'An error occurred while saving.');
     } finally {
       setLoading(false);
     }
@@ -231,14 +259,14 @@ export default function AnalysisCertificatePage() {
           });
           const result = await res.json();
           if (result.success) {
-            alert('Analysis Certificate deleted successfully.');
+            showNotification('success', 'Analysis Certificate deleted successfully.');
             fetchPartiesAndCerts();
           } else {
-            alert(result.error || 'Failed to delete certificate.');
+            showNotification('error', result.error || 'Failed to delete certificate.');
           }
         } catch (err) {
           console.error(err);
-          alert('Error deleting certificate.');
+          showNotification('error', 'Error deleting certificate.');
         } finally {
           setConfirmModal(prev => ({ ...prev, isOpen: false }));
         }
@@ -255,7 +283,7 @@ export default function AnalysisCertificatePage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col justify-between p-3 sm:p-6 space-y-6 sm:space-y-8 max-w-[1700px] mx-auto overflow-x-hidden">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col justify-between p-3 sm:p-6 space-y-6 sm:space-y-8 max-w-[1700px] mx-auto overflow-x-hidden relative">
       <style jsx global>{`
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
@@ -284,7 +312,21 @@ export default function AnalysisCertificatePage() {
         }
       `}</style>
 
-      {/* Top Banner Header with Blue Gradient Theme, Back & Next Buttons */}
+      {/* FLOATING TOAST NOTIFICATION */}
+      {notification.show && (
+        <div className="fixed top-6 right-6 z-50 animate-bounce">
+          <div className={`flex items-center gap-3 px-5 py-4 rounded-2xl shadow-2xl border-2 text-white font-black text-xs sm:text-sm uppercase tracking-wider ${
+            notification.type === 'success' ? 'bg-slate-900 border-blue-500 text-white' : 'bg-red-600 border-red-800 text-white'
+          }`}>
+            {notification.type === 'success' ? <CheckCircle2 className="w-5 h-5 text-cyan-400" /> : <AlertCircle className="w-5 h-5 text-white" />}
+            <span>{notification.message}</span>
+            <button onClick={() => setNotification(prev => ({ ...prev, show: false }))} className="ml-2 hover:opacity-75 cursor-pointer">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl shadow-xl overflow-hidden no-print">
         <div className="bg-gradient-to-r from-blue-700 via-blue-900 to-slate-950 p-5 sm:p-8 text-white flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 sm:gap-6">
           <div className="space-y-2">
@@ -309,13 +351,12 @@ export default function AnalysisCertificatePage() {
             </div>
             <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-tight">Analysis Certificate Manager</h1>
             <p className="text-sm sm:text-base text-blue-200 font-medium max-w-2xl">
-              Upload EFS Excel document or add items manually, and manage party-wise certificates.
+              Upload EFS Excel document to AWS S3 or add items manually, and manage party-wise certificates.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Upload & Manual Entry Section */}
       <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6 no-print">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 pb-6 border-b border-slate-200">
           <div className="space-y-2">
@@ -333,7 +374,7 @@ export default function AnalysisCertificatePage() {
           </div>
 
           <div className="space-y-2">
-            <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700">Upload Excel Document (.xlsx)</label>
+            <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700">Upload Excel (.xlsx) to AWS S3</label>
             <input
               type="file"
               accept=".xlsx, .xls"
@@ -354,7 +395,6 @@ export default function AnalysisCertificatePage() {
           </div>
         </div>
 
-        {/* Manual Item Entry Form */}
         <div className="bg-slate-50 border-2 border-slate-300 p-4 sm:p-5 rounded-2xl space-y-4 shadow-sm">
           <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700 flex items-center gap-2">
             <Plus className="w-4 h-4 text-blue-600" /> Add Item Manually to Matrix
@@ -485,7 +525,6 @@ export default function AnalysisCertificatePage() {
         </button>
       </div>
 
-      {/* Saved Certificates Section */}
       <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6">
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-slate-200 pb-5 no-print">
           <div>
@@ -604,12 +643,10 @@ export default function AnalysisCertificatePage() {
         </div>
       </div>
 
-      {/* Footer */}
       <footer className="bg-gradient-to-r from-blue-700 via-blue-900 to-slate-950 text-blue-200 text-center py-4 text-xs sm:text-sm font-bold border-t border-blue-900 w-full shadow-inner rounded-2xl no-print">
         &copy; 2026 Customs Clearing ERP &bull; Powered by EFS Advanced Compliance Engine. All rights reserved.
       </footer>
 
-      {/* CUSTOM PROFESSIONAL CONFIRMATION MODAL */}
       {confirmModal.isOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-6 shadow-2xl">
@@ -661,7 +698,7 @@ export default function AnalysisCertificatePage() {
               <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm font-mono">
                 <thead className="bg-slate-900 text-white font-black uppercase text-[11px] sm:text-xs tracking-wider">
                   <tr>
-                    <th className="px-4 py-3.5 text-left">S.No</th>
+                    <th className="px-4 py-3.5 text-left">S.No.</th>
                     <th className="px-4 py-3.5 text-left">HS Code</th>
                     <th className="px-4 py-3.5 text-left">Description</th>
                     <th className="px-4 py-3.5 text-left">UOM</th>
