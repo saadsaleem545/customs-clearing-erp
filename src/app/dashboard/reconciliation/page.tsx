@@ -65,9 +65,10 @@ export default function InputOutputDetailsPage() {
   const [loadingExportDetails, setLoadingExportDetails] = useState(false);
   const [selectedExportItem, setSelectedExportItem] = useState<any>(null);
 
-  // Auto-loaded Analysis Certificate items based on selected Export GD item
-  const [autoLoadedCertObject, setAutoLoadedCertObject] = useState<any>(null);
-  const [selectedCertItem, setSelectedCertItem] = useState<any>(null);
+  // Multi-certificate states for selected export item
+  const [parsedCertificateNumbers, setParsedCertificateNumbers] = useState<string[]>([]);
+  const [loadedCertificatesMap, setLoadedCertificatesMap] = useState<{ [certNo: string]: any }>({});
+  const [selectedCertItemsMap, setSelectedCertItemsMap] = useState<{ [certNo: string]: any }>({});
   const [loadingCertItems, setLoadingCertItems] = useState(false);
 
   const partyDropdownRef = useRef<HTMLDivElement>(null);
@@ -92,12 +93,16 @@ export default function InputOutputDetailsPage() {
   const exportGdNumber = selectedExportGdObject?.exportGdNumber || selectedExportGdObject?.gdNumber || selectedExportItem?.exportGdNo || 'N/A';
   const exportDesc = selectedExportItem?.exportParticulars || selectedExportItem?.itemDescription || selectedExportItem?.description || 'Export Item';
 
-  const certReqQty = Number(selectedCertItem?.requirementQty ?? selectedCertItem?.quantity ?? 0);
-  const certWastQtyPerUnit = Number(selectedCertItem?.wastageQty ?? 0); 
-  const certInputWithWastage = Number(selectedCertItem?.inputWithWastage ?? (certReqQty + certWastQtyPerUnit));
-  const certWastagePct = Number(selectedCertItem?.wastagePct ?? 0);
+  // We aggregate or take the first selected cert item for calculations if multiple cards exist, or aggregate them
+  const firstSelectedCertKey = Object.keys(selectedCertItemsMap)[0];
+  const activeCertItem = firstSelectedCertKey ? selectedCertItemsMap[firstSelectedCertKey] : null;
+
+  const certReqQty = Number(activeCertItem?.requirementQty ?? activeCertItem?.quantity ?? 0);
+  const certWastQtyPerUnit = Number(activeCertItem?.wastageQty ?? 0); 
+  const certInputWithWastage = Number(activeCertItem?.inputWithWastage ?? (certReqQty + certWastQtyPerUnit));
+  const certWastagePct = Number(activeCertItem?.wastagePct ?? 0);
   
-  const currentCertNumber = autoLoadedCertObject?.certificateNumber || autoLoadedCertObject?.certNumber || selectedExportItem?.analysisCertNo || 'N/A';
+  const currentCertNumber = firstSelectedCertKey || selectedExportItem?.analysisCertNo || 'N/A';
   
   const totalConsumedQty = exportQty * certInputWithWastage;
   const totalWastageQty = exportQty * certWastQtyPerUnit; 
@@ -152,8 +157,8 @@ export default function InputOutputDetailsPage() {
       showToast('Error: Export GD and its specific item must be selected!', 'error');
       return;
     }
-    if (!autoLoadedCertObject || !selectedCertItem) {
-      showToast('Error: Analysis Certificate item must be selected!', 'error');
+    if (!activeCertItem) {
+      showToast('Error: Please select an item from the Analysis Certificate cards!', 'error');
       return;
     }
 
@@ -613,41 +618,57 @@ export default function InputOutputDetailsPage() {
   const handleSelectExportItem = async (item: any) => {
     setSelectedExportItem(item);
     
-    // Automatically fetch and load the corresponding Analysis Certificate items using analysisCertNo
-    const certNo = item.analysisCertNo;
-    if (certNo) {
+    // Parse comma-separated certificate numbers (e.g., "CERT-1, CERT-2")
+    const rawCertStr = item.analysisCertNo || '';
+    const certList = rawCertStr.split(',').map((c: string) => c.trim()).filter(Boolean);
+    setParsedCertificateNumbers(certList);
+    setLoadedCertificatesMap({});
+    setSelectedCertItemsMap({});
+
+    if (certList.length > 0) {
+      setLoadingCertItems(true);
       try {
-        setLoadingCertItems(true);
-        const res = await fetch(`/api/v1/analysis?certificateNumber=${encodeURIComponent(certNo)}`);
-        const json = await res.json();
-        if (json.success && json.data && json.data.length > 0) {
-          const matchedCert = json.data[0];
-          setAutoLoadedCertObject(matchedCert);
-          if (matchedCert.items && matchedCert.items.length > 0) {
-            setSelectedCertItem(matchedCert.items[0]);
+        const certsMap: { [key: string]: any } = {};
+        const selectedMap: { [key: string]: any } = {};
+
+        for (const certNo of certList) {
+          const res = await fetch(`/api/v1/analysis?certificateNumber=${encodeURIComponent(certNo)}`);
+          const json = await res.json();
+          let matchedCert = null;
+
+          if (json.success && json.data && json.data.length > 0) {
+            matchedCert = json.data[0];
+          } else {
+            // Fallback search by party
+            const allRes = await fetch(`/api/v1/analysis?partyId=${selectedPartyId}`);
+            const allJson = await allRes.json();
+            if (allJson.success && allJson.data) {
+              matchedCert = allJson.data.find((c: any) => (c.certificateNumber || c.certNumber || '').toLowerCase() === certNo.toLowerCase());
+            }
           }
-        } else {
-          // Fallback search in all analysis certificates
-          const allRes = await fetch(`/api/v1/analysis?partyId=${selectedPartyId}`);
-          const allJson = await allRes.json();
-          if (allJson.success && allJson.data) {
-            const found = allJson.data.find((c: any) => (c.certificateNumber || c.certNumber || '').toLowerCase() === certNo.toLowerCase());
-            if (found) {
-              setAutoLoadedCertObject(found);
-              const cItems = found.items || found.certificateItems || [];
-              if (cItems.length > 0) setSelectedCertItem(cItems[0]);
+
+          if (matchedCert) {
+            certsMap[certNo] = matchedCert;
+            const cItems = matchedCert.items || matchedCert.certificateItems || [];
+            if (cItems.length > 0) {
+              selectedMap[certNo] = cItems[0]; // Default select first item of each certificate
             }
           }
         }
+
+        setLoadedCertificatesMap(certsMap);
+        setSelectedCertItemsMap(selectedMap);
       } catch (err) {
-        console.error('Error auto-loading certificate items:', err);
+        console.error('Error auto-loading multi-certificate items:', err);
       } finally {
         setLoadingCertItems(false);
       }
     }
   };
 
-  const handleSelectCertItem = (item: any) => setSelectedCertItem(item);
+  const handleSelectCertItemForCert = (certNo: string, item: any) => {
+    setSelectedCertItemsMap(prev => ({ ...prev, [certNo]: item }));
+  };
 
   const handleClearImportTable = () => {
     setSelectedGdObject(null);
@@ -657,8 +678,9 @@ export default function InputOutputDetailsPage() {
   const handleClearExportTable = () => {
     setSelectedExportGdObject(null);
     setSelectedExportItem(null);
-    setAutoLoadedCertObject(null);
-    setSelectedCertItem(null);
+    setParsedCertificateNumbers([]);
+    setLoadedCertificatesMap({});
+    setSelectedCertItemsMap({});
   };
 
   const groupedReconciliations = useMemo(() => {
@@ -741,7 +763,7 @@ export default function InputOutputDetailsPage() {
             </div>
             <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white leading-tight">Input Output Details &amp; Reconciliation Statement</h1>
             <p className="text-sm sm:text-base text-blue-200 font-small max-w-3xl">
-              Select Name of Trader, Import GD, Export GD, and corresponding Analysis Certificate items automatically.
+              Select Name of Trader, Import GD, Export GD, and corresponding Multi-Analysis Certificate items automatically.
             </p>
           </div>
         </div>
@@ -1101,82 +1123,113 @@ export default function InputOutputDetailsPage() {
           </div>
         </div>
 
-          {/* --- 3. Automatically Loaded Analysis Certificate Items Box --- */}
+          {/* --- 3. Multi-Certificate Auto-Loaded Cards Box --- */}
           {selectedExportItem && (
-            <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6 animate-fadeIn">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
+            <div className="space-y-6 mt-6">
+              <div className="bg-slate-900 text-white p-4 sm:p-5 rounded-2xl flex items-center justify-between shadow-lg">
                 <div>
-                  <span className="text-[11px] font-black uppercase tracking-wider bg-blue-100 text-blue-800 px-3 py-1 rounded-full border border-blue-300">
-                    Auto-Linked Analysis Certificate
+                  <span className="text-[11px] font-black uppercase tracking-wider bg-blue-600 text-white px-3 py-1 rounded-full">
+                    Analysis Certificates Detected
                   </span>
-                  <h3 className="text-xl sm:text-2xl font-black text-slate-900 mt-2">
-                    Certificate #: <span className="text-blue-700 font-mono">{currentCertNumber}</span>
+                  <h3 className="text-lg sm:text-xl font-black mt-1">
+                    Total Certificates Linked: {parsedCertificateNumbers.length}
                   </h3>
                 </div>
-                {autoLoadedCertObject && (
-                  <span className="text-xs sm:text-sm font-mono bg-emerald-50 text-emerald-800 px-3.5 py-1.5 rounded-xl border border-emerald-300 font-black inline-flex items-center gap-2">
-                    <Check className="w-4 h-4 text-emerald-600" /> Loaded {(autoLoadedCertObject.items || autoLoadedCertObject.certificateItems || []).length} items
-                  </span>
-                )}
               </div>
 
               {loadingCertItems ? (
-                <div className="text-center py-8 text-slate-500 font-bold text-sm">Loading certificate items automatically...</div>
-              ) : !autoLoadedCertObject || (!autoLoadedCertObject.items && !autoLoadedCertObject.certificateItems) || ((autoLoadedCertObject.items?.length || 0) === 0 && (autoLoadedCertObject.certificateItems?.length || 0) === 0) ? (
-                <div className="text-center py-8 text-slate-500 font-bold text-sm bg-slate-50 rounded-2xl border border-slate-200">
-                  No certificate items found for Cert No: <span className="font-mono font-black text-slate-800">{currentCertNumber}</span>
+                <div className="text-center py-8 text-slate-500 font-bold text-sm bg-white border-2 border-slate-900 rounded-2xl shadow">Loading multiple analysis certificates automatically...</div>
+              ) : parsedCertificateNumbers.length === 0 ? (
+                <div className="text-center py-8 text-slate-500 font-bold text-sm bg-white border-2 border-slate-900 rounded-2xl shadow">
+                  No certificate number found in this export item.
                 </div>
               ) : (
-                <div className="overflow-x-auto border-2 border-slate-300 rounded-2xl shadow-sm bg-white">
-                  <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
-                    <thead className="bg-slate-900 text-white font-black uppercase text-[11px] sm:text-xs tracking-wider">
-                      <tr>
-                        <th className="px-3 sm:px-5 py-3.5 w-12 text-center">Select</th>
-                        <th className="px-3 sm:px-5 py-3.5 text-left">Sr #</th>
-                        <th className="px-3 sm:px-5 py-3.5 text-left">Item Description</th>
-                        <th className="px-3 sm:px-5 py-3.5 text-left">HS Code</th>
-                        <th className="px-3 sm:px-5 py-3.5 text-left">UOM</th>
-                        <th className="px-3 sm:px-5 py-3.5 text-right">Requirement (Net IOR)</th>
-                        <th className="px-3 sm:px-5 py-3.5 text-right">Wastage (KG)</th>
-                        <th className="px-3 sm:px-5 py-3.5 text-right">Input w/ Wastage</th>
-                        <th className="px-3 sm:px-5 py-3.5 text-right">Wastage %</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200 text-slate-900 font-medium">
-                      {(autoLoadedCertObject.items || autoLoadedCertObject.certificateItems || []).map((item: any, idx: number) => {
-                        const description = item.itemDescription || item.particulars || item.description || 'Certificate Item';
-                        const hsCode = item.hsCode || item.hs_code || 'N/A';
-                        const uom = item.unit || item.uom || 'KG';
-                        const qty = item.requirementQty ?? item.quantity ?? 0;
-                        const wastQty = item.wastageQty ?? 0;
-                        const inputWast = item.inputWithWastage ?? (Number(qty) + Number(wastQty));
-                        const wastage = item.wastagePct ?? 0;
-                        const isItemSel = selectedCertItem?.id === item.id;
+                <div className="space-y-6">
+                  {parsedCertificateNumbers.map((certNo, certIdx) => {
+                    const certObj = loadedCertificatesMap[certNo];
+                    const certItems = certObj?.items || certObj?.certificateItems || [];
+                    const selectedItemForThisCert = selectedCertItemsMap[certNo];
 
-                        return (
-                          <tr 
-                            key={item.id || idx} 
-                            onClick={() => handleSelectCertItem(item)}
-                            className={`cursor-pointer transition ${isItemSel ? 'bg-blue-50 font-black' : 'hover:bg-slate-50'}`}
-                          >
-                            <td className="px-3 sm:px-5 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
-                              <button type="button" onClick={() => handleSelectCertItem(item)} className="text-blue-600 focus:outline-none cursor-pointer">
-                                {isItemSel ? <CheckCircle className="w-5 h-5 text-blue-600 fill-blue-100" /> : <Circle className="w-5 h-5 text-slate-400" />}
-                              </button>
-                            </td>
-                            <td className="px-3 sm:px-5 py-3.5 font-bold text-slate-700">{idx + 1}</td>
-                            <td className="px-3 sm:px-5 py-3.5 font-black text-slate-900">{description}</td>
-                            <td className="px-3 sm:px-5 py-3.5 font-mono font-black text-slate-900">{hsCode}</td>
-                            <td className="px-3 sm:px-5 py-3.5 font-mono font-black text-slate-700">{uom}</td>
-                            <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-blue-700">{formatNumber(qty, 4)}</td>
-                            <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-700">{formatNumber(wastQty, 4)}</td>
-                            <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(inputWast, 4)}</td>
-                            <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-emerald-700">{formatNumber(wastage, 2)}%</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                    return (
+                      <div key={certNo || certIdx} className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6 animate-fadeIn">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
+                          <div>
+                            <span className="text-[11px] font-black uppercase tracking-wider bg-blue-100 text-blue-800 px-3 py-1 rounded-full border border-blue-300">
+                              Certificate Card #{certIdx + 1}
+                            </span>
+                            <h4 className="text-xl sm:text-2xl font-black text-slate-900 mt-2">
+                              Certificate #: <span className="text-blue-700 font-mono">{certNo}</span>
+                            </h4>
+                          </div>
+                          <span className="text-xs sm:text-sm font-mono bg-emerald-50 text-emerald-800 px-3.5 py-1.5 rounded-xl border border-emerald-300 font-black inline-flex items-center gap-2">
+                            <Check className="w-4 h-4 text-emerald-600" /> {certItems.length} items available
+                          </span>
+                        </div>
+
+                        {!certObj ? (
+                          <div className="text-center py-6 text-amber-700 font-bold text-xs sm:text-sm bg-amber-50 rounded-2xl border border-amber-300">
+                            Warning: Certificate <span className="font-mono font-black">{certNo}</span> was not found in saved party analysis certificates. Please ensure it is saved in the system.
+                          </div>
+                        ) : certItems.length === 0 ? (
+                          <div className="text-center py-6 text-slate-500 font-bold text-xs sm:text-sm bg-slate-50 rounded-2xl border border-slate-200">
+                            No items found inside certificate: <span className="font-mono font-black text-slate-800">{certNo}</span>
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto border-2 border-slate-300 rounded-2xl shadow-sm bg-white">
+                            <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
+                              <thead className="bg-slate-900 text-white font-black uppercase text-[11px] sm:text-xs tracking-wider">
+                                <tr>
+                                  <th className="px-3 sm:px-5 py-3.5 w-12 text-center">Select</th>
+                                  <th className="px-3 sm:px-5 py-3.5 text-left">Sr #</th>
+                                  <th className="px-3 sm:px-5 py-3.5 text-left">Item Description</th>
+                                  <th className="px-3 sm:px-5 py-3.5 text-left">HS Code</th>
+                                  <th className="px-3 sm:px-5 py-3.5 text-left">UOM</th>
+                                  <th className="px-3 sm:px-5 py-3.5 text-right">Requirement (Net IOR)</th>
+                                  <th className="px-3 sm:px-5 py-3.5 text-right">Wastage (KG)</th>
+                                  <th className="px-3 sm:px-5 py-3.5 text-right">Input w/ Wastage</th>
+                                  <th className="px-3 sm:px-5 py-3.5 text-right">Wastage %</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-200 text-slate-900 font-medium">
+                                {certItems.map((item: any, idx: number) => {
+                                  const description = item.itemDescription || item.particulars || item.description || 'Certificate Item';
+                                  const hsCode = item.hsCode || item.hs_code || 'N/A';
+                                  const uom = item.unit || item.uom || 'KG';
+                                  const qty = item.requirementQty ?? item.quantity ?? 0;
+                                  const wastQty = item.wastageQty ?? 0;
+                                  const inputWast = item.inputWithWastage ?? (Number(qty) + Number(wastQty));
+                                  const wastage = item.wastagePct ?? 0;
+                                  const isItemSel = selectedItemForThisCert?.id === item.id;
+
+                                  return (
+                                    <tr 
+                                      key={item.id || idx} 
+                                      onClick={() => handleSelectCertItemForCert(certNo, item)}
+                                      className={`cursor-pointer transition ${isItemSel ? 'bg-blue-50 font-black' : 'hover:bg-slate-50'}`}
+                                    >
+                                      <td className="px-3 sm:px-5 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                        <button type="button" onClick={() => handleSelectCertItemForCert(certNo, item)} className="text-blue-600 focus:outline-none cursor-pointer">
+                                          {isItemSel ? <CheckCircle className="w-5 h-5 text-blue-600 fill-blue-100" /> : <Circle className="w-5 h-5 text-slate-400" />}
+                                        </button>
+                                      </td>
+                                      <td className="px-3 sm:px-5 py-3.5 font-bold text-slate-700">{idx + 1}</td>
+                                      <td className="px-3 sm:px-5 py-3.5 font-black text-slate-900">{description}</td>
+                                      <td className="px-3 sm:px-5 py-3.5 font-mono font-black text-slate-900">{hsCode}</td>
+                                      <td className="px-3 sm:px-5 py-3.5 font-mono font-black text-slate-700">{uom}</td>
+                                      <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-blue-700">{formatNumber(qty, 4)}</td>
+                                      <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-700">{formatNumber(wastQty, 4)}</td>
+                                      <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(inputWast, 4)}</td>
+                                      <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-emerald-700">{formatNumber(wastage, 2)}%</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1186,7 +1239,7 @@ export default function InputOutputDetailsPage() {
       )}
 
     {/* --- AUTOMATED CONSUMPTION & RECONCILIATION SUMMARY CARD --- */}
-    {selectedExportItem && selectedImportItem && selectedCertItem && (
+    {selectedExportItem && selectedImportItem && activeCertItem && (
       <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-2xl space-y-6 mt-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-200 pb-4 gap-4">
           <div className="flex items-center gap-3">
