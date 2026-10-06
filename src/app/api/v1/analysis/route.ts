@@ -2,16 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { Decimal } from '@prisma/client/runtime/library';
 
-// GET /api/v1/analysis - Fetch Analysis Certificates
+// GET /api/v1/analysis - Fetch Analysis Certificates (Fixed certificateNumber query handling)
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const partyId = searchParams.get('partyId');
-    const certNumber = searchParams.get('certNumber');
+    const certNumber = searchParams.get('certNumber') || searchParams.get('certificateNumber');
 
     const where: any = {};
     if (partyId) where.partyId = partyId;
-    if (certNumber) where.certificateNumber = { contains: certNumber, mode: 'insensitive' };
+    if (certNumber) {
+      where.certificateNumber = { 
+        equals: certNumber.trim(), 
+        mode: 'insensitive' 
+      };
+    }
 
     const certificates = await prisma.analysisCertificate.findMany({
       where,
@@ -42,7 +47,7 @@ export async function POST(req: NextRequest) {
     }
 
     const existing = await prisma.analysisCertificate.findUnique({
-      where: { certificateNumber },
+      where: { certificateNumber: certificateNumber.trim() },
     });
 
     if (existing) {
@@ -55,7 +60,7 @@ export async function POST(req: NextRequest) {
     const newCert = await prisma.$transaction(async (tx) => {
       return await tx.analysisCertificate.create({
         data: {
-          certificateNumber,
+          certificateNumber: certificateNumber.trim(),
           partyId,
           items: {
             create: items.map((item: any, idx: number) => {
