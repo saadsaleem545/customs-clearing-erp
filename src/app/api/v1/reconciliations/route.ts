@@ -162,10 +162,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 3. Direct Certificate per-unit Values Mapping
+    // 3. Direct Certificate per-unit Values Mapping with Exact 4-Decimal Precision
     const importQty = new Decimal(payloadImportQty ?? inputMaterial.importedQty.toString());
     const importValuePkr = new Decimal(payloadImportValue ?? inputMaterial.importValuePkr.toString());
     
+    // Explicitly parse with Decimal to preserve exact decimals like 0.6375 and 0.2125
     const netIocoConsumption = requirementQty !== undefined ? new Decimal(requirementQty) : new Decimal(0);
     const totalWastageKg = wastageQty !== undefined ? new Decimal(wastageQty) : new Decimal(0);
     const consumptionIncWastagePerUnit = inputWithWastage !== undefined ? new Decimal(inputWithWastage) : netIocoConsumption.plus(totalWastageKg);
@@ -243,8 +244,8 @@ export async function POST(req: NextRequest) {
           importValuePkr: importValuePkr,
           inputPct: resolvedHsCode,
           analysisCertNo: analysisCertNo || 'N/A',
-          netIocoConsumption,
-          iocoWastageQty: totalWastageKg,
+          netIocoConsumption,       // Preserves exact Decimal(12, 4) value like 0.6375
+          iocoWastageQty: totalWastageKg, // Preserves exact Decimal(12, 4) value like 0.2125
           grossIocoConsumption: consumptionIncWastagePerUnit,
           wastagePercentage: wastagePct,
           exportGdNo,

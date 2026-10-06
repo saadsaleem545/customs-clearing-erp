@@ -29,6 +29,10 @@ export default function AnalysisCertificatePage() {
   const [filterPartyId, setFilterPartyId] = useState('');
   const [searchCertNo, setSearchCertNo] = useState('');
 
+  // Pagination States
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5; // Har page par 5 certificates show honge (apni marzi se adjust kar sakte hain)
+
   // Professional Toast Notification State
   const [notification, setNotification] = useState<{
     show: boolean;
@@ -281,6 +285,12 @@ export default function AnalysisCertificatePage() {
       setPrintingCertId(null);
     }, 100);
   };
+
+  // Pagination calculation for certificates list
+  const totalPages = Math.ceil(certificates.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentCertificatesPage = certificates.slice(indexOfFirstItem, indexOfLastItem);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col justify-between p-3 sm:p-6 space-y-6 sm:space-y-8 max-w-[1700px] mx-auto overflow-x-hidden relative">
@@ -539,14 +549,14 @@ export default function AnalysisCertificatePage() {
                 type="text"
                 placeholder="Search Certificate No..."
                 value={searchCertNo}
-                onChange={(e) => setSearchCertNo(e.target.value)}
+                onChange={(e) => { setSearchCertNo(e.target.value); setCurrentPage(1); }}
                 className="w-full sm:w-64 pl-10 pr-4 py-3 bg-slate-50 border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
               />
             </div>
 
             <select
               value={filterPartyId}
-              onChange={(e) => setFilterPartyId(e.target.value)}
+              onChange={(e) => { setFilterPartyId(e.target.value); setCurrentPage(1); }}
               className="p-3 bg-slate-50 border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm cursor-pointer"
             >
               <option value="">-- All Parties --</option>
@@ -563,82 +573,162 @@ export default function AnalysisCertificatePage() {
               No analysis certificates found matching your search or filter.
             </p>
           ) : (
-            certificates.map((cert) => (
-              <div 
-                key={cert.id} 
-                className={`bg-slate-50 border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-6 shadow-md space-y-4 ${printingCertId === cert.id ? 'printable-cert-card' : ''}`}
-              >
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-200 pb-3">
-                  <div>
-                    <span className="text-blue-700 font-black text-sm sm:text-base font-mono block sm:inline">{cert.certificateNumber}</span>
-                    <span className="text-slate-600 sm:ml-3 block sm:inline text-xs sm:text-sm font-bold">Party: <strong className="text-slate-900 font-black">{cert.party?.companyName}</strong></span>
-                  </div>
-                  <div className="flex items-center justify-between lg:justify-end gap-3 flex-wrap">
-                    <span className="text-xs text-slate-500 font-bold font-mono no-print">Items: {cert.items?.length || 0} &bull; {new Date(cert.createdAt).toLocaleDateString()}</span>
-                    
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <button
-                        onClick={() => setSelectedMobileCertItems({ items: cert.items, certNumber: cert.certificateNumber, partyName: cert.party?.companyName })}
-                        className="block sm:hidden bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase tracking-wider px-3.5 py-2 rounded-xl transition shadow cursor-pointer no-print"
-                      >
-                        View Items
-                      </button>
+            <div className="space-y-4">
+              {currentCertificatesPage.map((cert) => (
+                <div 
+                  key={cert.id} 
+                  className={`bg-slate-50 border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-6 shadow-md space-y-4 ${printingCertId === cert.id ? 'printable-cert-card' : ''}`}
+                >
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                    <div>
+                      <span className="text-blue-700 font-black text-sm sm:text-base font-mono block sm:inline">{cert.certificateNumber}</span>
+                      <span className="text-slate-600 sm:ml-3 block sm:inline text-xs sm:text-sm font-bold">Party: <strong className="text-slate-900 font-black">{cert.party?.companyName}</strong></span>
+                    </div>
+                    <div className="flex items-center justify-between lg:justify-end gap-3 flex-wrap">
+                      <span className="text-xs text-slate-500 font-bold font-mono no-print">Items: {cert.items?.length || 0} &bull; {new Date(cert.createdAt).toLocaleDateString()}</span>
+                      
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          onClick={() => setSelectedMobileCertItems({ items: cert.items, certNumber: cert.certificateNumber, partyName: cert.party?.companyName })}
+                          className="block sm:hidden bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase tracking-wider px-3.5 py-2 rounded-xl transition shadow cursor-pointer no-print"
+                        >
+                          View Items
+                        </button>
 
-                      <button
-                        onClick={() => handlePrintCertificate(cert.id)}
-                        className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3.5 sm:px-4 py-2 rounded-xl transition text-xs font-black uppercase tracking-wider cursor-pointer no-print shadow"
-                        title="Print Certificate"
-                      >
-                        <Printer className="w-4 h-4" /> Print
-                      </button>
+                        <button
+                          onClick={() => handlePrintCertificate(cert.id)}
+                          className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3.5 sm:px-4 py-2 rounded-xl transition text-xs font-black uppercase tracking-wider cursor-pointer no-print shadow"
+                          title="Print Certificate"
+                        >
+                          <Printer className="w-4 h-4" /> Print
+                        </button>
 
-                      <button
-                        onClick={() => handleDeleteCertificate(cert.id, cert.certificateNumber)}
-                        className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3.5 sm:px-4 py-2 rounded-xl transition text-xs font-black uppercase tracking-wider cursor-pointer no-print shadow"
-                        title="Delete Certificate"
-                      >
-                        <Trash2 className="w-4 h-4" /> Delete
-                      </button>
+                        <button
+                          onClick={() => handleDeleteCertificate(cert.id, cert.certificateNumber)}
+                          className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3.5 sm:px-4 py-2 rounded-xl transition text-xs font-black uppercase tracking-wider cursor-pointer no-print shadow"
+                          title="Delete Certificate"
+                        >
+                          <Trash2 className="w-4 h-4" /> Delete
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-                
-                <div className="hidden sm:block max-h-[280px] overflow-y-auto border-2 border-slate-300 rounded-2xl shadow-sm bg-white">
-                  <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm font-mono">
-                    <thead className="bg-slate-900 text-white font-black uppercase text-[11px] sm:text-xs tracking-wider sticky top-0 z-10">
-                      <tr>
-                        <th className="py-3 px-4 text-left">S.No</th>
-                        <th className="py-3 px-4 text-left">HS Code</th>
-                        <th className="py-3 px-4 text-left">Item Description</th>
-                        <th className="py-3 px-4 text-left">UOM</th>
-                        <th className="py-3 px-4 text-right">Requirement</th>
-                        <th className="py-3 px-4 text-right">Wastage (KG)</th>
-                        <th className="py-3 px-4 text-right">Input w/ Wastage</th>
-                        <th className="py-3 px-4 text-right">Wastage %</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200 text-slate-800 font-medium">
-                      {cert.items.map((i: any) => (
-                        <tr key={i.id} className="hover:bg-slate-50 transition">
-                          <td className="py-3 px-4 font-bold">{i.serialNo}</td>
-                          <td className="py-3 px-4 text-blue-700 font-black">{i.hsCode}</td>
-                          <td className="py-3 px-4 font-black text-slate-900">{i.itemDescription}</td>
-                          <td className="py-3 px-4 font-black">{i.uom}</td>
-                          <td className="py-3 px-4 text-right text-emerald-700 font-black">{Number(i.requirementQty)}</td>
-                          <td className="py-3 px-4 text-right font-black">{Number(i.wastageQty)}</td>
-                          <td className="py-3 px-4 text-right text-amber-700 font-black">{Number(i.inputWithWastage)}</td>
-                          <td className="py-3 px-4 text-right font-black">{Number(i.wastagePct)}%</td>
+                  
+                  <div className="hidden sm:block max-h-[280px] overflow-y-auto border-2 border-slate-300 rounded-2xl shadow-sm bg-white">
+                    <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm font-mono">
+                      <thead className="bg-slate-900 text-white font-black uppercase text-[11px] sm:text-xs tracking-wider sticky top-0 z-10">
+                        <tr>
+                          <th className="py-3 px-4 text-left">S.No</th>
+                          <th className="py-3 px-4 text-left">HS Code</th>
+                          <th className="py-3 px-4 text-left">Item Description</th>
+                          <th className="py-3 px-4 text-left">UOM</th>
+                          <th className="py-3 px-4 text-right">Requirement</th>
+                          <th className="py-3 px-4 text-right">Wastage (KG)</th>
+                          <th className="py-3 px-4 text-right">Input w/ Wastage</th>
+                          <th className="py-3 px-4 text-right">Wastage %</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 text-slate-800 font-medium">
+                        {cert.items.map((i: any) => (
+                          <tr key={i.id} className="hover:bg-slate-50 transition">
+                            <td className="py-3 px-4 font-bold">{i.serialNo}</td>
+                            <td className="py-3 px-4 text-blue-700 font-black">{i.hsCode}</td>
+                            <td className="py-3 px-4 font-black text-slate-900">{i.itemDescription}</td>
+                            <td className="py-3 px-4 font-black">{i.uom}</td>
+                            <td className="py-3 px-4 text-right text-emerald-700 font-black">{Number(i.requirementQty)}</td>
+                            <td className="py-3 px-4 text-right font-black">{Number(i.wastageQty)}</td>
+                            <td className="py-3 px-4 text-right text-amber-700 font-black">{Number(i.inputWithWastage)}</td>
+                            <td className="py-3 px-4 text-right font-black">{Number(i.wastagePct)}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="block sm:hidden text-slate-600 text-xs font-bold">
+                    <span>Tap <strong>View Items</strong> to inspect full item breakdown matrix.</span>
+                  </div>
+                </div>
+              ))}
+
+              {/* Pagination Controls Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-100 p-3.5 rounded-2xl border-2 border-slate-300 shadow-sm no-print">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-slate-800 uppercase tracking-wider">Go to page</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={totalPages || 1}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const val = Number((e.currentTarget as HTMLInputElement).value);
+                        if (val >= 1 && val <= totalPages) {
+                          setCurrentPage(val);
+                        }
+                      }
+                    }}
+                    placeholder="Page"
+                    className="w-16 p-2 bg-white border-2 border-slate-300 rounded-xl text-xs font-bold text-center text-slate-900 focus:outline-none focus:border-blue-600"
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      const inputEl = (e.currentTarget.previousElementSibling as HTMLInputElement);
+                      const val = Number(inputEl?.value);
+                      if (val >= 1 && val <= totalPages) {
+                        setCurrentPage(val);
+                      }
+                    }}
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow cursor-pointer transition"
+                  >
+                    Go
+                  </button>
                 </div>
 
-                <div className="block sm:hidden text-slate-600 text-xs font-bold">
-                  <span>Tap <strong>View Items</strong> to inspect full item breakdown matrix.</span>
+                <div className="text-xs sm:text-sm font-black text-slate-900 font-mono">
+                  Page {currentPage} Of {totalPages || 1}
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    className="p-2.5 bg-white border-2 border-slate-300 rounded-xl disabled:opacity-40 cursor-pointer hover:bg-slate-50 transition shadow-sm"
+                    title="First Page"
+                  >
+                    ⏮
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="p-2.5 bg-white border-2 border-slate-300 rounded-xl disabled:opacity-40 cursor-pointer hover:bg-slate-50 transition shadow-sm"
+                    title="Previous Page"
+                  >
+                    ◀
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage >= totalPages}
+                    className="p-2.5 bg-white border-2 border-slate-300 rounded-xl disabled:opacity-40 cursor-pointer hover:bg-slate-50 transition shadow-sm"
+                    title="Next Page"
+                  >
+                    ▶
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage >= totalPages}
+                    className="p-2.5 bg-white border-2 border-slate-300 rounded-xl disabled:opacity-40 cursor-pointer hover:bg-slate-50 transition shadow-sm"
+                    title="Last Page"
+                  >
+                    ⏭
+                  </button>
                 </div>
               </div>
-            ))
+            </div>
           )}
         </div>
       </div>

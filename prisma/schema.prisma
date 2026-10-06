@@ -166,22 +166,22 @@ model ExportGd {
 }
 
 model ExportGdItem {
-  id                String   @id @default(uuid())
-  exportGdId        String
-  serialNo          Int      @default(1)
-  exportHsCode      String
+  id              String   @id @default(uuid())
+  exportGdId      String
+  serialNo        Int      @default(1)
+  exportHsCode    String
   exportParticulars String
-  qtyOfExports      Decimal  @db.Decimal(12, 4)
-  valueOfeExports   Decimal  @db.Decimal(12, 4)
-  importHsCode      String
-  inputValue        Decimal  @db.Decimal(12, 4)
-  wastageValue      Decimal  @db.Decimal(12, 4)
-  consumedQty       Decimal  @db.Decimal(12, 4)
-  wastageQty        Decimal  @db.Decimal(12, 4)
-  analysisCertNo    String?  // <-- Added field for Analysis Certificate Number mapping
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  exportGd          ExportGd @relation(fields: [exportGdId], references: [id], onDelete: Cascade)
+  qtyOfExports    Decimal  @db.Decimal(12, 4)
+  valueOfeExports Decimal  @db.Decimal(12, 4)
+  importHsCode    String
+  inputValue      Decimal  @db.Decimal(12, 4)
+  wastageValue    Decimal  @db.Decimal(12, 4)
+  consumedQty     Decimal  @db.Decimal(12, 4)
+  wastageQty      Decimal  @db.Decimal(12, 4)
+  analysisCertNo  String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  exportGd        ExportGd @relation(fields: [exportGdId], references: [id], onDelete: Cascade)
 
   @@map("export_gd_items")
 }
@@ -262,20 +262,20 @@ model ReconciliationItem {
   importValuePkr        Decimal              @db.Decimal(15, 2)
   inputPct              String
   analysisCertNo        String?
-  netIocoConsumption    Decimal              @db.Decimal(12, 3)
-  iocoWastageQty        Decimal              @db.Decimal(12, 3)
-  grossIocoConsumption  Decimal              @db.Decimal(12, 3)
+  netIocoConsumption    Decimal              @db.Decimal(12, 4) // Updated to Decimal(12, 4)
+  iocoWastageQty        Decimal              @db.Decimal(12, 4) // Updated to Decimal(12, 4)
+  grossIocoConsumption  Decimal              @db.Decimal(12, 4) // Updated to Decimal(12, 4)
   wastagePercentage     Decimal              @db.Decimal(5, 2)
   exportGdNo            String?
   exportDescription     String?
-  exportQtyKg           Decimal              @default(0.000) @db.Decimal(12, 3)
+  exportQtyKg           Decimal              @default(0.000) @db.Decimal(12, 4) // Updated to Decimal(12, 4)
   exportValuePkr        Decimal              @default(0.00) @db.Decimal(15, 2)
-  consumptionIncWastage Decimal              @default(0.000) @db.Decimal(12, 3)
-  actualWastageKg       Decimal              @default(0.000) @db.Decimal(12, 3)
-  closingBalanceKg      Decimal              @default(0.000) @db.Decimal(12, 3)
+  consumptionIncWastage Decimal              @default(0.000) @db.Decimal(12, 4) // Updated to Decimal(12, 4)
+  actualWastageKg       Decimal              @default(0.000) @db.Decimal(12, 4) // Updated to Decimal(12, 4)
+  closingBalanceKg      Decimal              @default(0.000) @db.Decimal(12, 4) // Updated to Decimal(12, 4)
   valueAddition         Decimal              @default(0.00) @db.Decimal(10, 2)
   unitClaim             Decimal?             @db.Decimal(12, 4)
-  calculatedDifference  Decimal?             @db.Decimal(12, 3)
+  calculatedDifference  Decimal?             @db.Decimal(12, 4) // Updated to Decimal(12, 4)
   itemStatus            ReconciliationStatus @default(PENDING)
   exportGd              ExportGd?            @relation(fields: [exportGdId], references: [id])
   inputMaterial         InputMaterial        @relation(fields: [inputMaterialId], references: [id], onDelete: Cascade)
@@ -308,11 +308,11 @@ model Invoice {
 }
 
 model InvoiceItem {
-  id        String  @id @default(uuid())
-  invoiceId String
+  id          String  @id @default(uuid())
+  invoiceId   String
   description String
-  amount    Decimal @db.Decimal(15, 2)
-  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount      Decimal @db.Decimal(15, 2)
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@map("invoice_items")
 }

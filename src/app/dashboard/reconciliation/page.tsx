@@ -22,6 +22,10 @@ export default function InputOutputDetailsPage() {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
 
+  // Pagination States for Statements
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5; // Har page par 5 statements dikhengi
+
   const [partyImports, setPartyImports] = useState<any[]>([]);
   const [selectedGdObject, setSelectedGdObject] = useState<any>(null);
   const [selectedImportItem, setSelectedImportItem] = useState<any>(null);
@@ -202,6 +206,7 @@ export default function InputOutputDetailsPage() {
 
       setPartyReconciliations(prev => [...prev, result.data]);
       showToast('Reconciliation saved successfully!');
+      setCurrentPage(1); // Reset to first page so the newly saved item is visible immediately
 
     } catch (err: any) {
       console.error('Error saving reconciliation:', err);
@@ -715,6 +720,14 @@ export default function InputOutputDetailsPage() {
     });
     return map;
   }, [partyReconciliations, filterPartyId, fromDate, toDate, statementsSearchQuery]);
+
+  // Paginated statements list
+  const groupKeysArray = useMemo(() => Object.keys(groupedReconciliations), [groupedReconciliations]);
+  const totalPages = Math.ceil(groupKeysArray.length / itemsPerPage);
+  const paginatedGroupKeys = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return groupKeysArray.slice(start, start + itemsPerPage);
+  }, [groupKeysArray, currentPage]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col justify-between p-3 sm:p-6 space-y-6 sm:space-y-8 max-w-[1700px] mx-auto overflow-x-hidden">
@@ -1311,7 +1324,7 @@ export default function InputOutputDetailsPage() {
       </div>
     )}
 
-    {/* --- RECONCILIATION STATEMENTS MATRIX TABLES WITH PARTY & DATE FILTERS --- */}
+    {/* --- RECONCILIATION STATEMENTS MATRIX TABLES WITH PARTY & DATE FILTERS & PAGINATION --- */}
     <div className="space-y-6 sm:space-y-10 mt-10">
       <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6">
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-slate-200 pb-5">
@@ -1351,7 +1364,7 @@ export default function InputOutputDetailsPage() {
             <label className="block text-xs font-black text-slate-800 uppercase tracking-wider">Filter By Party</label>
             <select
               value={filterPartyId}
-              onChange={(e) => setFilterPartyId(e.target.value)}
+              onChange={(e) => { setFilterPartyId(e.target.value); setCurrentPage(1); }}
               className="w-full p-3 bg-white border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-600 cursor-pointer shadow-sm"
             >
               <option value="ALL">-- All Parties --</option>
@@ -1366,7 +1379,7 @@ export default function InputOutputDetailsPage() {
             <input
               type="date"
               value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
+              onChange={(e) => { setFromDate(e.target.value); setCurrentPage(1); }}
               className="w-full p-3 bg-white border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm font-mono"
             />
           </div>
@@ -1376,7 +1389,7 @@ export default function InputOutputDetailsPage() {
             <input
               type="date"
               value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
+              onChange={(e) => { setToDate(e.target.value); setCurrentPage(1); }}
               className="w-full p-3 bg-white border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm font-mono"
             />
           </div>
@@ -1389,6 +1402,7 @@ export default function InputOutputDetailsPage() {
                 setFromDate('');
                 setToDate('');
                 setStatementsSearchQuery('');
+                setCurrentPage(1);
               }}
               className="w-full flex items-center justify-center gap-2 py-3 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl font-black text-xs uppercase tracking-wider transition cursor-pointer border border-slate-300 shadow-sm"
             >
@@ -1403,7 +1417,7 @@ export default function InputOutputDetailsPage() {
             type="text"
             placeholder="Search statements by GD No or Item..."
             value={statementsSearchQuery}
-            onChange={(e) => setStatementsSearchQuery(e.target.value)}
+            onChange={(e) => { setStatementsSearchQuery(e.target.value); setCurrentPage(1); }}
             className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600"
           />
         </div>
@@ -1413,198 +1427,281 @@ export default function InputOutputDetailsPage() {
         <div className="text-center py-12 text-slate-500 text-sm font-bold bg-white border-2 sm:border-4 border-slate-900 rounded-2xl shadow-xl">
           Loading saved reconciliations from database...
         </div>
-      ) : Object.keys(groupedReconciliations).length === 0 ? (
+      ) : groupKeysArray.length === 0 ? (
         <div className="text-center py-12 text-slate-500 text-sm font-bold bg-white border-2 sm:border-4 border-slate-900 rounded-2xl shadow-xl">
           No matching reconciliation statements found for the selected filter.
         </div>
       ) : (
-        Object.entries(groupedReconciliations).map(([groupKey, records]: [string, any[]]) => {
-          const [importGdNo, materialId, impQtyStr] = groupKey.split('___');
-           
-          let runningBalance = 0;
+        <div className="space-y-6">
+          {paginatedGroupKeys.map((groupKey) => {
+            const records = groupedReconciliations[groupKey];
+            const [importGdNo, materialId, impQtyStr] = groupKey.split('___');
+            
+            let runningBalance = 0;
 
-          const rows = records.map((rec: any, idx: number) => {
-            const impQty = Number(rec.importQty || rec.importQtyKg || impQtyStr || 0);
+            const rows = records.map((rec: any, idx: number) => {
+              const impQty = Number(rec.importQty || rec.importQtyKg || impQtyStr || 0);
 
-            const recExportQty = Number(rec.exportQtyKg || rec.exportQty || 0);
-            const recTotalConsumedQty = Number(rec.consumptionIncWastage || rec.totalConsumedQty || (recExportQty * Number(rec.grossIocoConsumption || rec.netIocoConsumption || 0)) || 0);
-             
-            let recWastageQty = Number(rec.actualWastageKg || rec.totalWastageQty || 0);
-            if (recWastageQty === 0 || recWastageQty < 1) {
-              const unitWast = Number(rec.wastageQty || rec.iocoWastageQty || 0);
-              recWastageQty = recExportQty * unitWast;
-            }
+              const recExportQty = Number(rec.exportQtyKg || rec.exportQty || 0);
+              const recTotalConsumedQty = Number(rec.consumptionIncWastage || rec.totalConsumedQty || (recExportQty * Number(rec.grossIocoConsumption || rec.netIocoConsumption || 0)) || 0);
+               
+              let recWastageQty = Number(rec.actualWastageKg || rec.totalWastageQty || 0);
+              if (recWastageQty === 0 || recWastageQty < 1) {
+                const unitWast = Number(rec.wastageQty || rec.iocoWastageQty || 0);
+                recWastageQty = recExportQty * unitWast;
+              }
 
-            if (idx === 0) {
-              runningBalance = impQty - recTotalConsumedQty;
-            } else {
-              runningBalance = runningBalance - recTotalConsumedQty;
-            }
+              if (idx === 0) {
+                runningBalance = impQty - recTotalConsumedQty;
+              } else {
+                runningBalance = runningBalance - recTotalConsumedQty;
+              }
 
-            return {
-              ...rec,
-              resolvedExportQty: recExportQty,
-              resolvedTotalConsumed: recTotalConsumedQty,
-              resolvedWastageQty: recWastageQty,
-              computedClosingBalance: runningBalance,
-            };
-          });
+              return {
+                ...rec,
+                resolvedExportQty: recExportQty,
+                resolvedTotalConsumed: recTotalConsumedQty,
+                resolvedWastageQty: recWastageQty,
+                computedClosingBalance: runningBalance,
+              };
+            });
 
-          const itemDesc = rows[0]?.importParticulars || rows[0]?.inputDescription || 'Standard Item';
+            const itemDesc = rows[0]?.importParticulars || rows[0]?.inputDescription || 'Standard Item';
 
-          return (
-            <div key={groupKey} className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6">
-              <div className="flex flex-col xl:flex-row xl:items-center justify-between border-b border-slate-200 pb-5 gap-4">
-                <div className="flex items-center gap-3">
-                  <FileText className="w-6 h-6 text-blue-600 flex-shrink-0" />
-                  <h3 className="text-xs sm:text-base font-black text-slate-900 uppercase tracking-wide">
-                    GD: <span className="text-blue-700 font-mono">{importGdNo}</span> &bull; Item: <span className="text-slate-800">{itemDesc}</span> &bull; Qty: <span className="text-blue-700 font-mono">{formatNumber(impQtyStr, 0)}</span>
-                  </h3>
+            return (
+              <div key={groupKey} className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6">
+                <div className="flex flex-col xl:flex-row xl:items-center justify-between border-b border-slate-200 pb-5 gap-4">
+                  <div className="flex items-center gap-3">
+                    <FileText className="w-6 h-6 text-blue-600 flex-shrink-0" />
+                    <h3 className="text-xs sm:text-base font-black text-slate-900 uppercase tracking-wide">
+                      GD: <span className="text-blue-700 font-mono">{importGdNo}</span> &bull; Item: <span className="text-slate-800">{itemDesc}</span> &bull; Qty: <span className="text-blue-700 font-mono">{formatNumber(impQtyStr, 0)}</span>
+                    </h3>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full xl:w-auto justify-start xl:justify-end">
+                    <span className="text-xs sm:text-sm font-mono bg-slate-100 px-3.5 py-2 rounded-xl border border-slate-300 font-black text-slate-800">
+                      Entries: {rows.length}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleExportExcel(groupKey, rows, importGdNo, itemDesc)}
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow transition cursor-pointer"
+                    >
+                      <Download className="w-4 h-4" /> Excel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handlePrintStatement(groupKey)}
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow transition cursor-pointer"
+                    >
+                      <Printer className="w-4 h-4" /> Print
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleClearSingleGdStatement(groupKey, records)}
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow transition cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" /> Clear
+                    </button>
+                  </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full xl:w-auto justify-start xl:justify-end">
-                  <span className="text-xs sm:text-sm font-mono bg-slate-100 px-3.5 py-2 rounded-xl border border-slate-300 font-black text-slate-800">
-                    Entries: {rows.length}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleExportExcel(groupKey, rows, importGdNo, itemDesc)}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow transition cursor-pointer"
-                  >
-                    <Download className="w-4 h-4" /> Excel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handlePrintStatement(groupKey)}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow transition cursor-pointer"
-                  >
-                    <Printer className="w-4 h-4" /> Print
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleClearSingleGdStatement(groupKey, records)}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow transition cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4" /> Clear
-                  </button>
+                <div id={`statement-table-${groupKey}`} className="overflow-x-auto border-2 border-slate-300 rounded-2xl shadow-sm bg-white">
+                  <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
+                    <thead>
+                      <tr className="bg-slate-100 border-b border-slate-200">
+                        <th colSpan={20} className="py-4 px-4 text-center text-slate-900 font-black text-base sm:text-xl tracking-wider uppercase">
+                          RECONCILIATION STATEMENT M/s - {currentPartyNameText}
+                        </th>
+                      </tr>
+                      <tr className="bg-slate-100 border-b border-slate-200">
+                        <th colSpan={20} className="py-3 px-4 text-center text-slate-800 font-black text-sm sm:text-base tracking-wider uppercase">
+                          EFS Authorization Cert No.: {partyEfsCertNo}
+                        </th>
+                      </tr>
+
+                      <tr className="bg-slate-900 text-white font-black uppercase tracking-wider border-b border-slate-200 text-center text-[11px] sm:text-xs">
+                        <th></th>
+                        <th colSpan={5} className="bg-blue-900 text-blue-100 px-3 py-2.5 border-r border-slate-700">Input</th>
+                        <th colSpan={5} className="bg-slate-800 text-slate-200 px-3 py-2.5 border-r border-slate-700">IOR</th>
+                        <th colSpan={6} className="bg-blue-950 text-blue-100 px-3 py-2.5 border-r border-slate-700">Output</th>
+                        <th colSpan={2} className="bg-slate-800 text-slate-200 px-3 py-2.5 border-r border-slate-700">Balance &amp; Value</th>
+                        <th className="bg-slate-900 text-white px-3 py-2.5 no-print">ACTIONS</th>
+                      </tr>
+
+                      <tr className="bg-slate-100 text-slate-800 font-black uppercase text-[11px] sm:text-xs tracking-wider text-left border-b border-slate-200">
+                        <th className="px-3 py-3.5 text-center w-12">S. No.</th>
+                        <th className="px-3 py-3.5">Import GD No.</th>
+                        <th className="px-3 py-3.5">Input Description</th>
+                        <th className="px-3 py-3.5 text-right">Import Qty (kg)</th>
+                        <th className="px-3 py-3.5 text-right">Import Value</th>
+                        <th className="px-3 py-3.5">Input PCT</th>
+                        <th className="px-3 py-3.5">Analysis Certificate No.</th>
+                        <th className="px-3 py-3.5 text-right">Consumption As per IOCO (Net IOR)</th>
+                        <th className="px-3 py-3.5 text-right">Wastages</th>
+                        <th className="px-3 py-3.5 text-right">Total Consumption (Gross IOR)</th>
+                        <th className="px-3 py-3.5 text-right">%age of Wastage</th>
+                        <th className="px-3 py-3.5">Export GD No.</th>
+                        <th className="px-3 py-3.5">Export Description</th>
+                        <th className="px-3 py-3.5 text-right">Export Qty (Kg)</th>
+                        <th className="px-3 py-3.5 text-right">Export value (Rs.)</th>
+                        <th className="px-3 py-3.5 text-right">Consumption including wastage</th>
+                        <th className="px-3 py-3.5 text-right">Wastages (kg)</th>
+                        <th className="px-3 py-3.5 text-right">Closing Balance (Kg)</th>
+                        <th className="px-3 py-3.5 text-right">Value Addition</th>
+                        <th className="px-3 py-3.5 text-center no-print">ACTIONS</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 text-slate-900 font-medium">
+                      {rows.map((rec: any, idx: number) => (
+                        <tr key={rec.id || idx} className="hover:bg-slate-50 transition">
+                          <td className="px-3 py-3.5 text-center font-bold text-slate-700">{idx + 1}</td>
+                          <td className="px-3 py-3.5 font-mono font-black text-blue-700">
+                            {idx === 0 ? (rec.importGdNo || importGdNo) : ''}
+                          </td>
+                          <td className="px-3 py-3.5 font-black text-slate-900">
+                            {idx === 0 ? (rec.importParticulars || rec.inputDescription || itemDesc) : ''}
+                          </td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">
+                            {idx === 0 ? formatNumber(rec.importQty || rec.importQtyKg || 0, 0) : ''}
+                          </td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">
+                            {idx === 0 ? formatNumber(rec.importValue || rec.importValuePkr || 0, 2) : ''}
+                          </td>
+                          <td className="px-3 py-3.5 font-mono font-black text-slate-800">
+                            {idx === 0 ? (rec.importHsCode || rec.inputPct || 'N/A') : ''}
+                          </td>
+                          <td className="px-3 py-3.5 font-mono font-black text-slate-800">
+                            {rec.analysisCertNo || 'N/A'}
+                          </td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-blue-700">{formatNumber(rec.requirementQty || rec.netIocoConsumption || 0, 4)}</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-700">{formatNumber(rec.wastageQty || rec.iocoWastageQty || 0, 4)}</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.grossIocoConsumption || rec.inputWithWastage || 0, 4)}</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-emerald-700">{formatNumber(rec.wastagePct || rec.wastagePercentage || 0, 2)}%</td>
+                          <td className="px-3 py-3.5 font-mono font-black text-blue-700">{rec.exportGdNo || 'N/A'}</td>
+                          <td className="px-3 py-3.5 font-black text-slate-900">{rec.exportDescription || 'Export Item'}</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.resolvedExportQty, 0)}</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.exportValuePkr || 0, 2)}</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-blue-700">{formatNumber(rec.resolvedTotalConsumed, 4)}</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-700">{formatNumber(rec.resolvedWastageQty, 4)}</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-emerald-700">{formatNumber(rec.computedClosingBalance, 4)}</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.valueAddition || 0, 2)}%</td>
+                          <td className="px-3 py-3.5 text-center no-print">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteRow(rec.id)}
+                                className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl border border-red-300 transition cursor-pointer shadow-sm"
+                                title="Delete Entry"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+
+                      {/* TOTAL ROW FOR CONSUMPTION & WASTAGES */}
+                      <tr className="bg-slate-900 font-black text-white border-t-4 border-slate-900">
+                        <td colSpan={15} className="px-4 py-4 text-right uppercase tracking-wider text-white text-xs sm:text-sm">
+                          TOTAL:
+                        </td>
+                        <td className="px-4 py-4 text-right font-mono text-cyan-400 text-xs sm:text-sm">
+                          {formatNumber(rows.reduce((sum, r) => sum + Number(r.resolvedTotalConsumed || 0), 4), 4)}
+                        </td>
+                        <td className="px-4 py-4 text-right font-mono text-amber-400 text-xs sm:text-sm">
+                          {formatNumber(rows.reduce((sum, r) => sum + Number(r.resolvedWastageQty || 0), 4), 4)}
+                        </td>
+                        <td colSpan={2} className="px-4 py-4"></td>
+                        <td className="px-4 py-4 text-center no-print"></td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
+            );
+          })}
 
-              <div id={`statement-table-${groupKey}`} className="overflow-x-auto border-2 border-slate-300 rounded-2xl shadow-sm bg-white">
-                <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
-                  <thead>
-                    <tr className="bg-slate-100 border-b border-slate-200">
-                      <th colSpan={20} className="py-4 px-4 text-center text-slate-900 font-black text-base sm:text-xl tracking-wider uppercase">
-                        RECONCILIATION STATEMENT M/s - {currentPartyNameText}
-                      </th>
-                    </tr>
-                    <tr className="bg-slate-100 border-b border-slate-200">
-                      <th colSpan={20} className="py-3 px-4 text-center text-slate-800 font-black text-sm sm:text-base tracking-wider uppercase">
-                        EFS Authorization Cert No.: {partyEfsCertNo}
-                      </th>
-                    </tr>
+          {/* PAGINATION CONTROLS BAR FOR STATEMENTS */}
+          {totalPages > 1 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border-2 border-slate-900 shadow-xl">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-slate-800 uppercase tracking-wider">Go to page</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const val = Number((e.currentTarget as HTMLInputElement).value);
+                      if (val >= 1 && val <= totalPages) {
+                        setCurrentPage(val);
+                      }
+                    }
+                  }}
+                  placeholder="Page"
+                  className="w-16 p-2 bg-slate-50 border-2 border-slate-300 rounded-xl text-xs font-bold text-center text-slate-900 focus:outline-none focus:border-blue-600"
+                />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    const inputEl = (e.currentTarget.previousElementSibling as HTMLInputElement);
+                    const val = Number(inputEl?.value);
+                    if (val >= 1 && val <= totalPages) {
+                      setCurrentPage(val);
+                    }
+                  }}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow cursor-pointer transition"
+                >
+                  Go
+                </button>
+              </div>
 
-                    <tr className="bg-slate-900 text-white font-black uppercase tracking-wider border-b border-slate-200 text-center text-[11px] sm:text-xs">
-                      <th></th>
-                      <th colSpan={5} className="bg-blue-900 text-blue-100 px-3 py-2.5 border-r border-slate-700">Input</th>
-                      <th colSpan={5} className="bg-slate-800 text-slate-200 px-3 py-2.5 border-r border-slate-700">IOR</th>
-                      <th colSpan={6} className="bg-blue-950 text-blue-100 px-3 py-2.5 border-r border-slate-700">Output</th>
-                      <th colSpan={2} className="bg-slate-800 text-slate-200 px-3 py-2.5 border-r border-slate-700">Balance &amp; Value</th>
-                      <th className="bg-slate-900 text-white px-3 py-2.5 no-print">ACTIONS</th>
-                    </tr>
+              <div className="text-xs sm:text-sm font-black text-slate-900 font-mono">
+                Page {currentPage} Of {totalPages}
+              </div>
 
-                    <tr className="bg-slate-100 text-slate-800 font-black uppercase text-[11px] sm:text-xs tracking-wider text-left border-b border-slate-200">
-                      <th className="px-3 py-3.5 text-center w-12">S. No.</th>
-                      <th className="px-3 py-3.5">Import GD No.</th>
-                      <th className="px-3 py-3.5">Input Description</th>
-                      <th className="px-3 py-3.5 text-right">Import Qty (kg)</th>
-                      <th className="px-3 py-3.5 text-right">Import Value</th>
-                      <th className="px-3 py-3.5">Input PCT</th>
-                      <th className="px-3 py-3.5">Analysis Certificate No.</th>
-                      <th className="px-3 py-3.5 text-right">Consumption As per IOCO (Net IOR)</th>
-                      <th className="px-3 py-3.5 text-right">Wastages</th>
-                      <th className="px-3 py-3.5 text-right">Total Consumption (Gross IOR)</th>
-                      <th className="px-3 py-3.5 text-right">%age of Wastage</th>
-                      <th className="px-3 py-3.5">Export GD No.</th>
-                      <th className="px-3 py-3.5">Export Description</th>
-                      <th className="px-3 py-3.5 text-right">Export Qty (Kg)</th>
-                      <th className="px-3 py-3.5 text-right">Export value (Rs.)</th>
-                      <th className="px-3 py-3.5 text-right">Consumption including wastage</th>
-                      <th className="px-3 py-3.5 text-right">Wastages (kg)</th>
-                      <th className="px-3 py-3.5 text-right">Closing Balance (Kg)</th>
-                      <th className="px-3 py-3.5 text-right">Value Addition</th>
-                      <th className="px-3 py-3.5 text-center no-print">ACTIONS</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 text-slate-900 font-medium">
-                    {rows.map((rec: any, idx: number) => (
-                      <tr key={rec.id || idx} className="hover:bg-slate-50 transition">
-                        <td className="px-3 py-3.5 text-center font-bold text-slate-700">{idx + 1}</td>
-                        <td className="px-3 py-3.5 font-mono font-black text-blue-700">
-                          {idx === 0 ? (rec.importGdNo || importGdNo) : ''}
-                        </td>
-                        <td className="px-3 py-3.5 font-black text-slate-900">
-                          {idx === 0 ? (rec.importParticulars || rec.inputDescription || itemDesc) : ''}
-                        </td>
-                        <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">
-                          {idx === 0 ? formatNumber(rec.importQty || rec.importQtyKg || 0, 0) : ''}
-                        </td>
-                        <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">
-                          {idx === 0 ? formatNumber(rec.importValue || rec.importValuePkr || 0, 2) : ''}
-                        </td>
-                        <td className="px-3 py-3.5 font-mono font-black text-slate-800">
-                          {idx === 0 ? (rec.importHsCode || rec.inputPct || 'N/A') : ''}
-                        </td>
-                        <td className="px-3 py-3.5 font-mono font-black text-slate-800">
-                          {rec.analysisCertNo || 'N/A'}
-                        </td>
-                        <td className="px-3 py-3.5 text-right font-mono font-black text-blue-700">{formatNumber(rec.requirementQty || rec.netIocoConsumption || 0, 4)}</td>
-                        <td className="px-3 py-3.5 text-right font-mono font-black text-slate-700">{formatNumber(rec.wastageQty || rec.iocoWastageQty || 0, 4)}</td>
-                        <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.grossIocoConsumption || rec.inputWithWastage || 0, 4)}</td>
-                        <td className="px-3 py-3.5 text-right font-mono font-black text-emerald-700">{formatNumber(rec.wastagePct || rec.wastagePercentage || 0, 2)}%</td>
-                        <td className="px-3 py-3.5 font-mono font-black text-blue-700">{rec.exportGdNo || 'N/A'}</td>
-                        <td className="px-3 py-3.5 font-black text-slate-900">{rec.exportDescription || 'Export Item'}</td>
-                        <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.resolvedExportQty, 0)}</td>
-                        <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.exportValuePkr || 0, 2)}</td>
-                        <td className="px-3 py-3.5 text-right font-mono font-black text-blue-700">{formatNumber(rec.resolvedTotalConsumed, 4)}</td>
-                        <td className="px-3 py-3.5 text-right font-mono font-black text-slate-700">{formatNumber(rec.resolvedWastageQty, 4)}</td>
-                        <td className="px-3 py-3.5 text-right font-mono font-black text-emerald-700">{formatNumber(rec.computedClosingBalance, 4)}</td>
-                        <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.valueAddition || 0, 2)}%</td>
-                        <td className="px-3 py-3.5 text-center no-print">
-                          <div className="flex items-center justify-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteRow(rec.id)}
-                              className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl border border-red-300 transition cursor-pointer shadow-sm"
-                              title="Delete Entry"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-
-                    {/* TOTAL ROW FOR CONSUMPTION & WASTAGES */}
-                    <tr className="bg-slate-900 font-black text-white border-t-4 border-slate-900">
-                      <td colSpan={15} className="px-4 py-4 text-right uppercase tracking-wider text-white text-xs sm:text-sm">
-                        TOTAL:
-                      </td>
-                      <td className="px-4 py-4 text-right font-mono text-cyan-400 text-xs sm:text-sm">
-                        {formatNumber(rows.reduce((sum, r) => sum + Number(r.resolvedTotalConsumed || 0), 4), 4)}
-                      </td>
-                      <td className="px-4 py-4 text-right font-mono text-amber-400 text-xs sm:text-sm">
-                        {formatNumber(rows.reduce((sum, r) => sum + Number(r.resolvedWastageQty || 0), 4), 4)}
-                      </td>
-                      <td colSpan={2} className="px-4 py-4"></td>
-                      <td className="px-4 py-4 text-center no-print"></td>
-                    </tr>
-                  </tbody>
-                </table>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="p-2.5 bg-white border-2 border-slate-300 rounded-xl disabled:opacity-40 cursor-pointer hover:bg-slate-50 transition shadow-sm"
+                  title="First Page"
+                >
+                  ⏮
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="p-2.5 bg-white border-2 border-slate-300 rounded-xl disabled:opacity-40 cursor-pointer hover:bg-slate-50 transition shadow-sm"
+                  title="Previous Page"
+                >
+                  ◀
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage >= totalPages}
+                  className="p-2.5 bg-white border-2 border-slate-300 rounded-xl disabled:opacity-40 cursor-pointer hover:bg-slate-50 transition shadow-sm"
+                  title="Next Page"
+                >
+                  ▶
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage >= totalPages}
+                  className="p-2.5 bg-white border-2 border-slate-300 rounded-xl disabled:opacity-40 cursor-pointer hover:bg-slate-50 transition shadow-sm"
+                  title="Last Page"
+                >
+                  ⏭
+                </button>
               </div>
             </div>
-          );
-        })
+          )}
+        </div>
       )}
     </div>
 

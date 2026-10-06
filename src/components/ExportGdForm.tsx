@@ -15,6 +15,10 @@ export default function ExportGdForm() {
   const [message, setMessage] = useState('');
   const [historySearch, setHistorySearch] = useState('');
 
+  // Pagination States
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   // Professional Toast Notification State
   const [notification, setNotification] = useState<{
     show: boolean;
@@ -547,6 +551,12 @@ export default function ExportGdForm() {
     return searchCondition && partyIdMatch && dateMatch;
   });
 
+  // Pagination calculation for filtered exports
+  const totalPages = Math.ceil(filteredExports.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentExportsPage = filteredExports.slice(indexOfFirstItem, indexOfLastItem);
+
   const handlePrintFilteredReport = () => {
     const allFilteredItems: any[] = [];
     filteredExports.forEach(rec => {
@@ -893,7 +903,7 @@ export default function ExportGdForm() {
             <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700">Filter by Party</label>
             <select
               value={filterPartyId}
-              onChange={(e) => setFilterPartyId(e.target.value)}
+              onChange={(e) => { setFilterPartyId(e.target.value); setCurrentPage(1); }}
               className="w-full p-3 bg-white border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-600 cursor-pointer shadow-sm"
             >
               <option value="">-- All Parties --</option>
@@ -908,7 +918,7 @@ export default function ExportGdForm() {
             <input
               type="date"
               value={filterFromDate}
-              onChange={(e) => setFilterFromDate(e.target.value)}
+              onChange={(e) => { setFilterFromDate(e.target.value); setCurrentPage(1); }}
               className="w-full p-3 bg-white border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 font-mono focus:outline-none focus:border-blue-600 shadow-sm"
             />
           </div>
@@ -918,7 +928,7 @@ export default function ExportGdForm() {
             <input
               type="date"
               value={filterToDate}
-              onChange={(e) => setFilterToDate(e.target.value)}
+              onChange={(e) => { setFilterToDate(e.target.value); setCurrentPage(1); }}
               className="w-full p-3 bg-white border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 font-mono focus:outline-none focus:border-blue-600 shadow-sm"
             />
           </div>
@@ -941,7 +951,7 @@ export default function ExportGdForm() {
               <Trash2 className="w-4 h-4" /> Delete Party GDs
             </button>
             <button
-              onClick={() => { setFilterPartyId(''); setFilterFromDate(''); setFilterToDate(''); setHistorySearch(''); }}
+              onClick={() => { setFilterPartyId(''); setFilterFromDate(''); setFilterToDate(''); setHistorySearch(''); setCurrentPage(1); }}
               className="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs sm:text-sm font-black uppercase tracking-wider py-3 px-4 rounded-xl transition cursor-pointer border border-slate-300 shadow-sm whitespace-nowrap"
               title="Reset Filters"
             >
@@ -955,46 +965,126 @@ export default function ExportGdForm() {
             {savedExports.length === 0 ? 'No export records found in database yet.' : 'No matching export GD found for selected party or date range.'}
           </p>
         ) : (
-          <div className="overflow-x-auto border-2 border-slate-900 rounded-2xl shadow-sm bg-white">
-            <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
-              <thead className="bg-slate-900 text-white font-black uppercase text-[11px] sm:text-xs tracking-wider">
-                <tr>
-                  <th className="px-4 py-3.5 text-left">Exporter (Party)</th>
-                  <th className="px-4 py-3.5 text-left">Export GD Number</th>
-                  <th className="px-4 py-3.5 text-left">GD Date</th>
-                  <th className="px-4 py-3.5 text-left">Items Count</th>
-                  <th className="px-4 py-3.5 text-center">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 text-slate-900 font-medium">
-                {filteredExports.map((rec, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50 transition">
-                    <td className="px-4 py-3.5 text-xs sm:text-sm font-black text-slate-900">{rec.party?.companyName || 'N/A'}</td>
-                    <td className="px-4 py-3.5 font-mono text-xs sm:text-sm font-black text-blue-700">{rec.gdNumber}</td>
-                    <td className="px-4 py-3.5 font-mono text-xs sm:text-sm font-black text-slate-900">{formatDateString(rec.gdDate)}</td>
-                    <td className="px-4 py-3.5">
-                      <span className="text-blue-700 px-3 py-1 rounded-lg text-xs sm:text-sm font-black font-mono">
-                        {rec.items?.length || 0} items
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5 text-center space-x-2 whitespace-nowrap">
-                      <button
-                        onClick={() => setSelectedGdItems({ items: rec.items, gdNumber: rec.gdNumber, partyName: rec.party?.companyName, gdDate: rec.gdDate })}
-                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase tracking-wider px-3.5 sm:px-4 py-2 rounded-xl transition cursor-pointer shadow"
-                      >
-                        View Items
-                      </button>
-                      <button
-                        onClick={() => handleDelete(rec.id, rec.gdNumber)}
-                        className="bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-wider px-3.5 sm:px-4 py-2 rounded-xl transition cursor-pointer shadow"
-                      >
-                        Delete
-                      </button>
-                    </td>
+          <div className="space-y-4">
+            <div className="overflow-x-auto border-2 border-slate-900 rounded-2xl shadow-sm bg-white">
+              <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
+                <thead className="bg-slate-900 text-white font-black uppercase text-[11px] sm:text-xs tracking-wider">
+                  <tr>
+                    <th className="px-4 py-3.5 text-left">Exporter (Party)</th>
+                    <th className="px-4 py-3.5 text-left">Export GD Number</th>
+                    <th className="px-4 py-3.5 text-left">GD Date</th>
+                    <th className="px-4 py-3.5 text-left">Items Count</th>
+                    <th className="px-4 py-3.5 text-center">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-200 text-slate-900 font-medium">
+                  {currentExportsPage.map((rec, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50 transition">
+                      <td className="px-4 py-3.5 text-xs sm:text-sm font-black text-slate-900">{rec.party?.companyName || 'N/A'}</td>
+                      <td className="px-4 py-3.5 font-mono text-xs sm:text-sm font-black text-blue-700">{rec.gdNumber}</td>
+                      <td className="px-4 py-3.5 font-mono text-xs sm:text-sm font-black text-slate-900">{formatDateString(rec.gdDate)}</td>
+                      <td className="px-4 py-3.5">
+                        <span className="text-blue-700 px-3 py-1 rounded-lg text-xs sm:text-sm font-black font-mono">
+                          {rec.items?.length || 0} items
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-center space-x-2 whitespace-nowrap">
+                        <button
+                          onClick={() => setSelectedGdItems({ items: rec.items, gdNumber: rec.gdNumber, partyName: rec.party?.companyName, gdDate: rec.gdDate })}
+                          className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase tracking-wider px-3.5 sm:px-4 py-2 rounded-xl transition cursor-pointer shadow"
+                        >
+                          View Items
+                        </button>
+                        <button
+                          onClick={() => handleDelete(rec.id, rec.gdNumber)}
+                          className="bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-wider px-3.5 sm:px-4 py-2 rounded-xl transition cursor-pointer shadow"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Controls Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-100 p-3.5 rounded-2xl border-2 border-slate-300 shadow-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-slate-800 uppercase tracking-wider">Go to page</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={totalPages || 1}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const val = Number((e.currentTarget as HTMLInputElement).value);
+                      if (val >= 1 && val <= totalPages) {
+                        setCurrentPage(val);
+                      }
+                    }
+                  }}
+                  placeholder="Page"
+                  className="w-16 p-2 bg-white border-2 border-slate-300 rounded-xl text-xs font-bold text-center text-slate-900 focus:outline-none focus:border-blue-600"
+                />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    const inputEl = (e.currentTarget.previousElementSibling as HTMLInputElement);
+                    const val = Number(inputEl?.value);
+                    if (val >= 1 && val <= totalPages) {
+                      setCurrentPage(val);
+                    }
+                  }}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow cursor-pointer transition"
+                >
+                  Go
+                </button>
+              </div>
+
+              <div className="text-xs sm:text-sm font-black text-slate-900 font-mono">
+                Page {currentPage} Of {totalPages || 1}
+              </div>
+
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="p-2.5 bg-white border-2 border-slate-300 rounded-xl disabled:opacity-40 cursor-pointer hover:bg-slate-50 transition shadow-sm"
+                  title="First Page"
+                >
+                  ⏮
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="p-2.5 bg-white border-2 border-slate-300 rounded-xl disabled:opacity-40 cursor-pointer hover:bg-slate-50 transition shadow-sm"
+                  title="Previous Page"
+                >
+                  ◀
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage >= totalPages}
+                  className="p-2.5 bg-white border-2 border-slate-300 rounded-xl disabled:opacity-40 cursor-pointer hover:bg-slate-50 transition shadow-sm"
+                  title="Next Page"
+                >
+                  ▶
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage >= totalPages}
+                  className="p-2.5 bg-white border-2 border-slate-300 rounded-xl disabled:opacity-40 cursor-pointer hover:bg-slate-50 transition shadow-sm"
+                  title="Last Page"
+                >
+                  ⏭
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
