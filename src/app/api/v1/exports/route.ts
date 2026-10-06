@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
         quantity: Number(it.qtyOfExports || 0),
         uom: 'KG',
         fobValueVal: Number(it.valueOfeExports || 0),
-        analysisCertNo: rec.analysisCertificate?.certificateNumber || it.analysisCertNo || '',
+        analysisCertNo: rec.analysisCertificate?.certificateNumber || '',
       }))
     }));
 
@@ -141,6 +141,7 @@ export async function POST(req: NextRequest) {
           where: { exportGdNumber: currentGdNum },
         });
 
+        // Strictly map only valid database columns, stripping out any extra fields like analysisCertNo
         const formattedItemsData = gdItems.map((item: any, idx: number) => ({
           serialNo: idx + 1,
           exportHsCode: item.hsCode || item.exportHsCode || '',
