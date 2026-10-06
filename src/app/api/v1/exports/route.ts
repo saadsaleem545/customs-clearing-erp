@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { Decimal } from '@prisma/client/runtime/library';
 
-// GET /api/v1/exports
+// GET /api/v1/exports (Optimized with Analysis Certificate relation mapping)
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -16,32 +16,37 @@ export async function GET(req: NextRequest) {
       include: {
         party: { select: { id: true, companyName: true, ntn: true } },
         items: true,
+        analysisCertificate: true,
       },
       orderBy: { createdAt: 'desc' },
+      take: 150,
     });
 
-    // Frontend compatibility ke liye items ki keys ko map kar rahe hain
     const formattedData = exportsList.map(rec => ({
       ...rec,
-      gdNumber: rec.exportGdNumber,
+      gdNumber: rec.exportGdNumber || '',
+      gdDate: rec.date || rec.createdAt,
       items: (rec.items || []).map((it: any) => ({
         ...it,
-        gdNumber: rec.exportGdNumber,
+        gdNumber: rec.exportGdNumber || '',
+        gdDate: rec.date || rec.createdAt,
         itemDescription: it.exportParticulars || '',
         hsCode: it.exportHsCode || '',
         quantity: Number(it.qtyOfExports || 0),
         uom: 'KG',
         fobValueVal: Number(it.valueOfeExports || 0),
+        analysisCertNo: rec.analysisCertificate?.certificateNumber || it.analysisCertNo || '',
       }))
     }));
 
     return NextResponse.json({ success: true, data: formattedData });
   } catch (error: any) {
+    console.error('API Export GET Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
 
-// POST /api/v1/exports
+// POST /api/v1/exports (Smart linking with Excel's Analysis Certificate Number)
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -49,7 +54,6 @@ export async function POST(req: NextRequest) {
 
     let targetPartyId = partyId;
 
-    // Agar partyId nahi di lekin partyName ya Excel se naam aaya hai
     if (!targetPartyId && partyName) {
       let party = await prisma.party.findFirst({
         where: {
@@ -83,19 +87,38 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Default Analysis Certificate ensure karna
-    let defaultCert = await prisma.analysisCertificate.findFirst();
-    if (!defaultCert) {
-      defaultCert = await prisma.analysisCertificate.create({
-        data: {
-          certificateNumber: 'CERT-AUTO-001',
-          partyId: targetPartyId,
-          approvalDate: new Date(),
-        } as any,
+    const incomingCertNo = items[0]?.analysisCertNo?.trim();
+
+    let analysisCert = null;
+    if (incomingCertNo) {
+      analysisCert = await prisma.analysisCertificate.findUnique({
+        where: { certificateNumber: incomingCertNo },
       });
+
+      if (!analysisCert) {
+        analysisCert = await prisma.analysisCertificate.create({
+          data: {
+            certificateNumber: incomingCertNo,
+            partyId: targetPartyId,
+          } as any,
+        });
+      }
+    } else {
+      analysisCert = await prisma.analysisCertificate.findFirst({
+        where: { partyId: targetPartyId },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      if (!analysisCert) {
+        analysisCert = await prisma.analysisCertificate.create({
+          data: {
+            certificateNumber: `CERT-${Math.floor(1000 + Math.random() * 9000)}`,
+            partyId: targetPartyId,
+          } as any,
+        });
+      }
     }
 
-    // Group items by GD Number (chahe manual form ho ya excel import)
     const groupedByGd: { [key: string]: any[] } = {};
     for (const item of items) {
       const gdNum = item.gdNumber || gdNumber || 'GD-EXP-UNKNOWN';
@@ -105,95 +128,106 @@ export async function POST(req: NextRequest) {
       groupedByGd[gdNum].push(item);
     }
 
-    const createdRecords = [];
-
-    for (const [currentGdNum, gdItems] of Object.entries(groupedByGd)) {
-      // Check agar ye GD pehle se mojood hai
-      let existingGd = await prisma.exportGd.findUnique({
-        where: { exportGdNumber: currentGdNum },
-      });
-
-      let extractedDate = gdDate ? new Date(gdDate) : new Date();
-      if (isNaN(extractedDate.getTime())) {
-        extractedDate = new Date();
-      }
-
-      if (existingGd) {
-        // Agar GD pehle se hai toh purane items delete karke naye daal do ya skip karo (Yahan update/recreate approach)
-        await prisma.exportGdItem.deleteMany({ where: { exportGdId: existingGd.id } });
-        await prisma.exportGd.update({
-          where: { id: existingGd.id },
-          data: {
-            items: {
-              create: gdItems.map((item: any, idx: number) => ({
-                serialNo: idx + 1,
-                exportHsCode: item.hsCode || item.exportHsCode || '',
-                exportParticulars: item.itemDescription || item.exportParticulars || '',
-                qtyOfExports: new Decimal(item.quantity || item.qtyOfExports || 0),
-                valueOfeExports: new Decimal(item.fobValueVal || item.valueOfeExports || 0),
-                importHsCode: '',
-                inputValue: new Decimal(0),
-                wastageValue: new Decimal(0),
-                consumedQty: new Decimal(0),
-                wastageQty: new Decimal(0),
-              })),
-            }
-          }
-        });
-        createdRecords.push(existingGd);
-      } else {
-        const newExport = await prisma.exportGd.create({
-          data: {
-            exportGdNumber: currentGdNum,
-            date: extractedDate,
-            partyId: targetPartyId,
-            importGdNumber: 'N/A',
-            analysisCertificateId: defaultCert.id,
-            items: {
-              create: gdItems.map((item: any, idx: number) => ({
-                serialNo: idx + 1,
-                exportHsCode: item.hsCode || item.exportHsCode || '',
-                exportParticulars: item.itemDescription || item.exportParticulars || '',
-                qtyOfExports: new Decimal(item.quantity || item.qtyOfExports || 0),
-                valueOfeExports: new Decimal(item.fobValueVal || item.valueOfeExports || 0),
-                importHsCode: '',
-                inputValue: new Decimal(0),
-                wastageValue: new Decimal(0),
-                consumedQty: new Decimal(0),
-                wastageQty: new Decimal(0),
-              })),
-            },
-          },
-          include: { items: true, party: true },
-        });
-
-        createdRecords.push(newExport);
-      }
+    let extractedDate = gdDate ? new Date(gdDate) : new Date();
+    if (isNaN(extractedDate.getTime())) {
+      extractedDate = new Date();
     }
+
+    const createdRecords = await prisma.$transaction(async (tx) => {
+      const results = [];
+
+      for (const [currentGdNum, gdItems] of Object.entries(groupedByGd)) {
+        let existingGd = await tx.exportGd.findUnique({
+          where: { exportGdNumber: currentGdNum },
+        });
+
+        const formattedItemsData = gdItems.map((item: any, idx: number) => ({
+          serialNo: idx + 1,
+          exportHsCode: item.hsCode || item.exportHsCode || '',
+          exportParticulars: item.itemDescription || item.exportParticulars || '',
+          qtyOfExports: new Decimal(item.quantity || item.qtyOfExports || 0),
+          valueOfeExports: new Decimal(item.fobValueVal || item.valueOfeExports || 0),
+          importHsCode: '',
+          inputValue: new Decimal(0),
+          wastageValue: new Decimal(0),
+          consumedQty: new Decimal(0),
+          wastageQty: new Decimal(0),
+        }));
+
+        if (existingGd) {
+          await tx.exportGdItem.deleteMany({ where: { exportGdId: existingGd.id } });
+          const updatedGd = await tx.exportGd.update({
+            where: { id: existingGd.id },
+            data: {
+              analysisCertificateId: analysisCert.id,
+              items: {
+                create: formattedItemsData,
+              }
+            },
+            include: { items: true, party: true, analysisCertificate: true },
+          });
+          results.push(updatedGd);
+        } else {
+          const newExport = await tx.exportGd.create({
+            data: {
+              exportGdNumber: currentGdNum,
+              date: extractedDate,
+              partyId: targetPartyId,
+              importGdNumber: 'N/A',
+              analysisCertificateId: analysisCert.id,
+              items: {
+                create: formattedItemsData,
+              },
+            },
+            include: { items: true, party: true, analysisCertificate: true },
+          });
+          results.push(newExport);
+        }
+      }
+
+      return results;
+    });
 
     return NextResponse.json({ success: true, data: createdRecords }, { status: 201 });
   } catch (error: any) {
-    console.error('API Export Error:', error);
+    console.error('API Export POST Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
 
-// DELETE /api/v1/exports?id=... OR ?exportGdNumber=...
+// DELETE /api/v1/exports?id=... OR ?exportGdNumber=... OR ?partyId=...
 export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
     const exportGdNumber = searchParams.get('exportGdNumber');
+    const partyId = searchParams.get('partyId');
 
-    if (!id && !exportGdNumber) {
-      return NextResponse.json({ success: false, error: 'Export Record ID or GD Number is required for deletion.' }, { status: 400 });
+    if (!id && !exportGdNumber && !partyId) {
+      return NextResponse.json({ success: false, error: 'Export Record ID, GD Number, or Party ID is required for deletion.' }, { status: 400 });
+    }
+
+    if (partyId) {
+      const targetGds = await prisma.exportGd.findMany({ where: { partyId }, select: { id: true } });
+      if (targetGds.length === 0) {
+        return NextResponse.json({ success: false, error: 'No Export GDs found for this party.' }, { status: 404 });
+      }
+
+      await prisma.$transaction(async (tx) => {
+        const gdIds = targetGds.map(g => g.id);
+        await tx.exportGdItem.deleteMany({
+          where: { exportGdId: { in: gdIds } },
+        });
+        await tx.exportGd.deleteMany({
+          where: { partyId },
+        });
+      });
+
+      return NextResponse.json({ success: true, message: 'All Export GDs for this party deleted successfully.' });
     }
 
     const whereClause = id ? { id } : { exportGdNumber: exportGdNumber! };
-
-    const targetGd = await prisma.exportGd.findFirst({
-      where: whereClause,
-    });
+    const targetGd = await prisma.exportGd.findFirst({ where: whereClause, select: { id: true } });
 
     if (!targetGd) {
       return NextResponse.json({ success: false, error: 'Export GD not found.' }, { status: 404 });
@@ -210,6 +244,7 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ success: true, message: 'Export GD deleted successfully.' });
   } catch (error: any) {
+    console.error('API Export DELETE Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

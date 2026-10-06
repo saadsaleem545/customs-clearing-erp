@@ -14,13 +14,10 @@ export default function InputOutputDetailsPage() {
   const [isPartyOpen, setIsPartyOpen] = useState(false);
   const [loadingParties, setLoadingParties] = useState(true);
 
-  // Search states for Import GD, Export GD, Analysis Certificate, and Statements Search Filter
   const [importSearchQuery, setImportSearchQuery] = useState('');
   const [exportSearchQuery, setExportSearchQuery] = useState('');
-  const [certSearchQuery, setCertSearchQuery] = useState('');
   const [statementsSearchQuery, setStatementsSearchQuery] = useState('');
 
-  // Advanced Filtering States for Reconciliation Section
   const [filterPartyId, setFilterPartyId] = useState('ALL');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -29,12 +26,10 @@ export default function InputOutputDetailsPage() {
   const [selectedGdObject, setSelectedGdObject] = useState<any>(null);
   const [selectedImportItem, setSelectedImportItem] = useState<any>(null);
 
-  // Unified Toast Notification State (replaces native alerts)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
 
-  // Helper to trigger floating toast notifications automatically
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ message, type });
     setTimeout(() => {
@@ -42,7 +37,6 @@ export default function InputOutputDetailsPage() {
     }, 4000);
   };
 
-  // Custom Professional Confirmation / Alert Modal State
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -57,14 +51,12 @@ export default function InputOutputDetailsPage() {
     onConfirm: () => {},
   });
 
-  // Quick Edit State for Export GD Item Quantity & Value (Two-Step: Update then Save)
   const [editingExportQtyItem, setEditingExportQtyItem] = useState<any>(null);
   const [tempExportQtyVal, setTempExportQtyVal] = useState('');
   const [isUpdatedInModal, setIsUpdatedInModal] = useState(false);
   const [calculatedBalancedQty, setCalculatedBalancedQty] = useState<number>(0);
   const [calculatedBalancedVal, setCalculatedBalancedVal] = useState<number>(0);
 
-  // Matrix table records state (global reconciliations if admin or party-specific)
   const [partyReconciliations, setPartyReconciliations] = useState<any[]>([]);
   const [loadingReconciliations, setLoadingReconciliations] = useState(false);
 
@@ -73,9 +65,10 @@ export default function InputOutputDetailsPage() {
   const [loadingExportDetails, setLoadingExportDetails] = useState(false);
   const [selectedExportItem, setSelectedExportItem] = useState<any>(null);
 
-  const [analysisCertificates, setAnalysisCertificates] = useState<any[]>([]);
-  const [selectedCertObject, setSelectedCertObject] = useState<any>(null);
+  // Auto-loaded Analysis Certificate items based on selected Export GD item
+  const [autoLoadedCertObject, setAutoLoadedCertObject] = useState<any>(null);
   const [selectedCertItem, setSelectedCertItem] = useState<any>(null);
+  const [loadingCertItems, setLoadingCertItems] = useState(false);
 
   const partyDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -94,19 +87,17 @@ export default function InputOutputDetailsPage() {
   const importItemDesc = selectedImportItem?.itemDescription || selectedImportItem?.particulars || selectedImportItem?.description || 'Import Material';
   const currentGdNumber = selectedGdObject?.gdNumber || selectedGdObject?.importGdNumber || 'N/A';
 
-  const exportQty = Number(selectedExportItem?.qtyOfExports || 0);
-  const exportVal = Number(selectedExportItem?.valueOfeExports || selectedExportItem?.fobValue || selectedExportItem?.value || 0);
+  const exportQty = Number(selectedExportItem?.qtyOfExports || selectedExportItem?.quantity || 0);
+  const exportVal = Number(selectedExportItem?.valueOfeExports || selectedExportItem?.fobValueVal || selectedExportItem?.fobValue || selectedExportItem?.value || 0);
   const exportGdNumber = selectedExportGdObject?.exportGdNumber || selectedExportGdObject?.gdNumber || selectedExportItem?.exportGdNo || 'N/A';
-  const exportDesc = selectedExportItem?.exportParticulars || selectedExportItem?.description || 'Export Item';
+  const exportDesc = selectedExportItem?.exportParticulars || selectedExportItem?.itemDescription || selectedExportItem?.description || 'Export Item';
 
-  // Direct certificate values mapping
   const certReqQty = Number(selectedCertItem?.requirementQty ?? selectedCertItem?.quantity ?? 0);
   const certWastQtyPerUnit = Number(selectedCertItem?.wastageQty ?? 0); 
   const certInputWithWastage = Number(selectedCertItem?.inputWithWastage ?? (certReqQty + certWastQtyPerUnit));
   const certWastagePct = Number(selectedCertItem?.wastagePct ?? 0);
   
-  // Selected Certificate Number for mapping
-  const currentCertNumber = selectedCertObject?.certificateNumber || selectedCertObject?.certNumber || 'N/A';
+  const currentCertNumber = autoLoadedCertObject?.certificateNumber || autoLoadedCertObject?.certNumber || selectedExportItem?.analysisCertNo || 'N/A';
   
   const totalConsumedQty = exportQty * certInputWithWastage;
   const totalWastageQty = exportQty * certWastQtyPerUnit; 
@@ -115,12 +106,10 @@ export default function InputOutputDetailsPage() {
   const totalConsumedValue = unitImportRate * totalConsumedQty;
   const valueAdditionPct = exportVal > 0 ? (totalConsumedValue / exportVal) * 100 : 0;
 
-  // Find current party object to retrieve EFS Certificate Number using valid Prisma schema fields (ntn / companyRegistrationNo)
   const currentPartyObj = parties.find(p => p.id === selectedPartyId);
   const partyEfsCertNo = currentPartyObj?.ntn || currentPartyObj?.companyRegistrationNo || currentPartyObj?.partyCode || 'N/A';
   const currentPartyNameText = currentPartyObj?.companyName || selectedPartyName || 'VALUED CLIENT';
 
-  // Calculate live balance specifically for the currently selected Import GD item using rolling logic
   const currentGdReconciliations = useMemo(() => {
     if (!currentGdNumber || currentGdNumber === 'N/A') return partyReconciliations;
     return partyReconciliations.filter(r => (r.importGdNo || r.importGdNumber) === currentGdNumber);
@@ -163,8 +152,8 @@ export default function InputOutputDetailsPage() {
       showToast('Error: Export GD and its specific item must be selected!', 'error');
       return;
     }
-    if (!selectedCertObject || !selectedCertItem) {
-      showToast('Error: Analysis Certificate and its specific item must be selected!', 'error');
+    if (!autoLoadedCertObject || !selectedCertItem) {
+      showToast('Error: Analysis Certificate item must be selected!', 'error');
       return;
     }
 
@@ -327,7 +316,6 @@ export default function InputOutputDetailsPage() {
     });
   };
 
-  // STEP 1: Modal Update Button Click (Calculates balanced quantities & values)
   const handleModalUpdateClick = () => {
     if (!editingExportQtyItem) return;
     const manualQty = Number(tempExportQtyVal);
@@ -336,8 +324,8 @@ export default function InputOutputDetailsPage() {
       return;
     }
 
-    const origQty = Number(editingExportQtyItem.qtyOfExports ?? 0);
-    const origVal = Number(editingExportQtyItem.valueOfeExports ?? 0);
+    const origQty = Number(editingExportQtyItem.qtyOfExports ?? editingExportQtyItem.quantity ?? 0);
+    const origVal = Number(editingExportQtyItem.valueOfeExports ?? editingExportQtyItem.fobValueVal ?? 0);
     const manualVal = origQty > 0 ? (origVal / origQty) * manualQty : origVal;
 
     const balancedQty = origQty - manualQty;
@@ -348,7 +336,6 @@ export default function InputOutputDetailsPage() {
     setIsUpdatedInModal(true);
   };
 
-  // STEP 2: Modal Save Button Click (Permanently applies balanced values to export item)
   const handleModalSaveClick = () => {
     if (!editingExportQtyItem || !selectedExportGdObject) return;
 
@@ -576,23 +563,14 @@ export default function InputOutputDetailsPage() {
     const fetchPartyData = async (partyId: string) => {
       if (!partyId) {
         setPartyImports([]);
-        setAnalysisCertificates([]);
         handleClearImportTable();
         handleClearExportTable();
-        handleClearCertTable();
         return;
       }
       try {
-        const [importRes, certRes] = await Promise.all([
-          fetch(`/api/v1/imports?partyId=${partyId}`),
-          fetch(`/api/v1/analysis?partyId=${partyId}`)
-        ]);
-
+        const importRes = await fetch(`/api/v1/imports?partyId=${partyId}`);
         const importJson = await importRes.json();
         if (importJson.success) setPartyImports(importJson.data || []);
-
-        const certJson = await certRes.json();
-        if (certJson.success) setAnalysisCertificates(certJson.data || []);
       } catch (err) {
         console.error('Error fetching party dependent data:', err);
       }
@@ -601,7 +579,6 @@ export default function InputOutputDetailsPage() {
     fetchPartyData(selectedPartyId);
     handleClearImportTable();
     handleClearExportTable();
-    handleClearCertTable();
   }, [selectedPartyId]);
 
   const filteredParties = parties.filter((party) => {
@@ -622,12 +599,6 @@ export default function InputOutputDetailsPage() {
     return gdNo.includes(q);
   });
 
-  const filteredCerts = analysisCertificates.filter(cert => {
-    const q = certSearchQuery.toLowerCase();
-    const certNo = (cert.certificateNumber || cert.certNumber || '').toLowerCase();
-    return certNo.includes(q);
-  });
-
   const handleSelectParty = (party: any) => {
     setSelectedPartyId(party.id);
     setSelectedPartyName(party.companyName);
@@ -639,8 +610,41 @@ export default function InputOutputDetailsPage() {
     setSelectedImportItem(item);
   };
 
-  const handleSelectExportItem = (item: any) => {
+  const handleSelectExportItem = async (item: any) => {
     setSelectedExportItem(item);
+    
+    // Automatically fetch and load the corresponding Analysis Certificate items using analysisCertNo
+    const certNo = item.analysisCertNo;
+    if (certNo) {
+      try {
+        setLoadingCertItems(true);
+        const res = await fetch(`/api/v1/analysis?certificateNumber=${encodeURIComponent(certNo)}`);
+        const json = await res.json();
+        if (json.success && json.data && json.data.length > 0) {
+          const matchedCert = json.data[0];
+          setAutoLoadedCertObject(matchedCert);
+          if (matchedCert.items && matchedCert.items.length > 0) {
+            setSelectedCertItem(matchedCert.items[0]);
+          }
+        } else {
+          // Fallback search in all analysis certificates
+          const allRes = await fetch(`/api/v1/analysis?partyId=${selectedPartyId}`);
+          const allJson = await allRes.json();
+          if (allJson.success && allJson.data) {
+            const found = allJson.data.find((c: any) => (c.certificateNumber || c.certNumber || '').toLowerCase() === certNo.toLowerCase());
+            if (found) {
+              setAutoLoadedCertObject(found);
+              const cItems = found.items || found.certificateItems || [];
+              if (cItems.length > 0) setSelectedCertItem(cItems[0]);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error auto-loading certificate items:', err);
+      } finally {
+        setLoadingCertItems(false);
+      }
+    }
   };
 
   const handleSelectCertItem = (item: any) => setSelectedCertItem(item);
@@ -653,10 +657,7 @@ export default function InputOutputDetailsPage() {
   const handleClearExportTable = () => {
     setSelectedExportGdObject(null);
     setSelectedExportItem(null);
-  };
-
-  const handleClearCertTable = () => {
-    setSelectedCertObject(null);
+    setAutoLoadedCertObject(null);
     setSelectedCertItem(null);
   };
 
@@ -740,7 +741,7 @@ export default function InputOutputDetailsPage() {
             </div>
             <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white leading-tight">Input Output Details &amp; Reconciliation Statement</h1>
             <p className="text-sm sm:text-base text-blue-200 font-small max-w-3xl">
-              Select Name of Trader, Import GD, Export GD, and Analysis Certificate to calculate and save items.
+              Select Name of Trader, Import GD, Export GD, and corresponding Analysis Certificate items automatically.
             </p>
           </div>
         </div>
@@ -855,8 +856,7 @@ export default function InputOutputDetailsPage() {
                       </div>
                     );
                   })
-                )
-                }
+                )}
               </div>
             </div>
 
@@ -973,22 +973,24 @@ export default function InputOutputDetailsPage() {
                           handleClearExportTable();
                           return;
                         }
-                        if (exp.items && exp.items.length > 0) {
-                          setSelectedExportGdObject(exp);
-                        } else {
+                        
+                        let targetExpGd = exp;
+                        if (!exp.items || exp.items.length === 0) {
                           setLoadingExportDetails(true);
                           try {
                             const res = await fetch(`/api/v1/exports/${exp.id}`);
                             const json = await res.json();
-                            setSelectedExportGdObject(json.success && json.data ? json.data : exp);
-                          } catch {
-                            setSelectedExportGdObject(exp);
+                            if (json.success && json.data) targetExpGd = json.data;
+                          } catch (err) {
+                            console.error(err);
                           } finally {
                             setLoadingExportDetails(false);
                           }
                         }
+
+                        setSelectedExportGdObject(targetExpGd);
                       }}
-                    className={`p-3.5 sm:p-4 rounded-xl text-xs sm:text-sm cursor-pointer border-2 transition flex justify-between items-center ${isSelected ? 'bg-blue-600 border-blue-900 text-white font-black shadow-lg' : 'bg-slate-50 border-slate-300 text-slate-900 hover:bg-slate-100 font-bold'}`}
+                      className={`p-3.5 sm:p-4 rounded-xl text-xs sm:text-sm cursor-pointer border-2 transition flex justify-between items-center ${isSelected ? 'bg-blue-600 border-blue-900 text-white font-black shadow-lg' : 'bg-slate-50 border-slate-300 text-slate-900 hover:bg-slate-100 font-bold'}`}
                     >
                       <div className="truncate pr-2">
                         <span className={`block truncate font-mono text-sm sm:text-base font-black ${isSelected ? 'text-white' : 'text-slate-900'}`}>{expGdNumberStr}</span>
@@ -1007,11 +1009,12 @@ export default function InputOutputDetailsPage() {
           <div className="lg:col-span-8">
             {selectedExportGdObject ? (
               <div className={`bg-slate-50 rounded-2xl p-4 sm:p-6 space-y-4 shadow-sm transition-all duration-300 ${selectedExportItem ? 'border-4 border-blue-600 ring-4 ring-blue-100' : 'border-2 border-slate-300'}`}>
-                <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-200 pb-3 gap-3">
                   <div>
                     <span className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider block">Export GD Items Details</span>
                     <span className="text-xs sm:text-sm text-blue-700 font-mono font-black">GD: {selectedExportGdObject.exportGdNumber || selectedExportGdObject.gdNumber}</span>
                   </div>
+
                   <button onClick={handleClearExportTable} className="p-2 rounded-xl bg-slate-200 text-slate-700 hover:bg-slate-300 transition cursor-pointer">
                     <X className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
@@ -1030,6 +1033,7 @@ export default function InputOutputDetailsPage() {
                           <th className="px-3 sm:px-5 py-3.5 text-left">Sr #</th>
                           <th className="px-3 sm:px-5 py-3.5 text-left">Particulars</th>
                           <th className="px-3 sm:px-5 py-3.5 text-left">HS Code</th>
+                          <th className="px-3 sm:px-5 py-3.5 text-left">Analysis Cert No.</th>
                           <th className="px-3 sm:px-5 py-3.5 text-right">Quantity</th>
                           <th className="px-3 sm:px-5 py-3.5 text-left">UOM</th>
                           <th className="px-3 sm:px-5 py-3.5 text-right">Value</th>
@@ -1037,10 +1041,11 @@ export default function InputOutputDetailsPage() {
                       </thead>
                       <tbody className="divide-y divide-slate-200 text-slate-900 font-medium">
                         {selectedExportGdObject.items.map((item: any, idx: number) => {
-                          const description = item.exportParticulars || 'Export Item';
-                          const hsCode = item.exportHsCode || 'N/A';
-                          const qty = item.qtyOfExports ?? 0;
-                          const val = item.valueOfeExports ?? 0;
+                          const description = item.exportParticulars || item.itemDescription || 'Export Item';
+                          const hsCode = item.exportHsCode || item.hsCode || 'N/A';
+                          const certNo = item.analysisCertNo || 'N/A';
+                          const qty = item.qtyOfExports ?? item.quantity ?? 0;
+                          const val = item.valueOfeExports ?? item.fobValueVal ?? 0;
                           const isItemSel = selectedExportItem?.id === item.id;
 
                           return (
@@ -1057,6 +1062,7 @@ export default function InputOutputDetailsPage() {
                               <td className="px-3 sm:px-5 py-3.5 font-bold text-slate-700">{idx + 1}</td>
                               <td className="px-3 sm:px-5 py-3.5 font-black text-slate-900">{description}</td>
                               <td className="px-3 sm:px-5 py-3.5 font-mono font-black text-slate-900">{hsCode}</td>
+                              <td className="px-3 sm:px-5 py-3.5 font-mono font-black text-blue-700">{certNo}</td>
                               <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-900" onClick={(e) => e.stopPropagation()}>
                                 <div className="flex items-center justify-end gap-2">
                                   <span>{formatNumber(qty, 0)}</span>
@@ -1095,156 +1101,92 @@ export default function InputOutputDetailsPage() {
           </div>
         </div>
 
-        {/* --- 3. Analysis Certificate Box --- */}
-        <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
-            <h3 className="text-xl sm:text-2xl font-black text-slate-900 flex items-center gap-3">
-              <span className="w-3.5 h-3.5 rounded-full bg-blue-600"></span> Select Analysis Certificate *
-            </h3>
-            {selectedCertObject && (
-              <span className="text-xs sm:text-sm font-mono bg-blue-50 text-blue-700 px-3.5 py-1.5 rounded-xl border border-blue-300 font-black inline-flex items-center gap-2">
-                <Check className="w-4 h-4" /> Selected Certificate: {selectedCertObject.certificateNumber || selectedCertObject.certNumber}
-              </span>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            <div className="lg:col-span-4 space-y-3">
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-4 top-3.5 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search Certificate No..."
-                  value={certSearchQuery}
-                  onChange={(e) => setCertSearchQuery(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 bg-slate-50 border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600"
-                />
-              </div>
-              <div className="max-h-72 overflow-y-auto space-y-2.5">
-                {filteredCerts.length === 0 ? (
-                  <p className="text-xs text-slate-500 text-center py-4 font-bold bg-slate-50 rounded-xl border border-slate-200">No certificates found.</p>
-                ) : (
-                  filteredCerts.map(cert => {
-                    const isSelected = selectedCertObject?.id === cert.id;
-                    const certNumberStr = cert.certificateNumber || cert.certNumber || 'N/A';
-                    const certItemsCount = cert.items?.length || cert.certificateItems?.length || 0;
-                    return (
-                      <div 
-                        key={cert.id}
-                        onClick={async () => {
-                          if (isSelected) {
-                            handleClearCertTable();
-                            return;
-                          }
-                          if (cert.items && cert.items.length > 0) {
-                            setSelectedCertObject(cert);
-                          } else {
-                            try {
-                              const res = await fetch(`/api/v1/analysis/${cert.id}`);
-                              const json = await res.json();
-                              setSelectedCertObject(json.success && json.data ? json.data : cert);
-                            } catch {
-                              setSelectedCertObject(cert);
-                            }
-                          }
-                        }}
-                      className={`p-3.5 sm:p-4 rounded-xl text-xs sm:text-sm cursor-pointer border-2 transition flex justify-between items-center ${isSelected ? 'bg-blue-600 border-blue-900 text-white font-black shadow-lg' : 'bg-slate-50 border-slate-300 text-slate-900 hover:bg-slate-100 font-bold'}`}
-                      >
-                        <div className="truncate pr-2">
-                          <span className={`block truncate font-mono text-sm sm:text-base font-black ${isSelected ? 'text-white' : 'text-slate-900'}`}>{certNumberStr}</span>
-                          <span className={`text-[11px] sm:text-xs mt-0.5 block ${isSelected ? 'text-blue-100' : 'text-slate-500'}`}>{certItemsCount} items</span>
-                        </div>
-                        <span className={`px-3 py-1 rounded-lg font-black text-xs transition flex-shrink-0 ${isSelected ? 'bg-white text-blue-700 shadow' : 'bg-slate-200 text-slate-800'}`}>
-                          {isSelected ? 'Selected' : 'Select'}
-                        </span>
-                      </div>
-                    );
-                  })
+          {/* --- 3. Automatically Loaded Analysis Certificate Items Box --- */}
+          {selectedExportItem && (
+            <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6 animate-fadeIn">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
+                <div>
+                  <span className="text-[11px] font-black uppercase tracking-wider bg-blue-100 text-blue-800 px-3 py-1 rounded-full border border-blue-300">
+                    Auto-Linked Analysis Certificate
+                  </span>
+                  <h3 className="text-xl sm:text-2xl font-black text-slate-900 mt-2">
+                    Certificate #: <span className="text-blue-700 font-mono">{currentCertNumber}</span>
+                  </h3>
+                </div>
+                {autoLoadedCertObject && (
+                  <span className="text-xs sm:text-sm font-mono bg-emerald-50 text-emerald-800 px-3.5 py-1.5 rounded-xl border border-emerald-300 font-black inline-flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-600" /> Loaded {(autoLoadedCertObject.items || autoLoadedCertObject.certificateItems || []).length} items
+                  </span>
                 )}
               </div>
-            </div>
 
-            <div className="lg:col-span-8">
-              {selectedCertObject ? (
-                <div className={`bg-slate-50 rounded-2xl p-4 sm:p-6 space-y-4 shadow-sm transition-all duration-300 ${selectedCertItem ? 'border-4 border-blue-600 ring-4 ring-blue-100' : 'border-2 border-slate-300'}`}>
-                  <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-                    <div>
-                      <span className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider block">Analysis Certificate Items Details</span>
-                      <span className="text-xs sm:text-sm text-blue-700 font-mono font-black">Cert #: {selectedCertObject.certificateNumber || selectedCertObject.certNumber}</span>
-                    </div>
-                    <button onClick={handleClearCertTable} className="p-2 rounded-xl bg-slate-200 text-slate-700 hover:bg-slate-300 transition cursor-pointer">
-                      <X className="w-4 h-4 sm:w-5 sm:h-5" />
-                    </button>
-                  </div>
-
-                  {(!selectedCertObject.items && !selectedCertObject.certificateItems) || 
-                     ((selectedCertObject.items?.length || 0) === 0 && (selectedCertObject.certificateItems?.length || 0) === 0) ? (
-                    <p className="text-xs sm:text-sm text-slate-500 text-center py-6 font-bold">No certificate items found.</p>
-                  ) : (
-                    <div className="overflow-x-auto border-2 border-slate-300 rounded-2xl shadow-sm bg-white">
-                      <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
-                        <thead className="bg-slate-900 text-white font-black uppercase text-[11px] sm:text-xs tracking-wider">
-                          <tr>
-                            <th className="px-3 sm:px-5 py-3.5 w-12 text-center">Select</th>
-                            <th className="px-3 sm:px-5 py-3.5 text-left">Sr #</th>
-                            <th className="px-3 sm:px-5 py-3.5 text-left">Particulars</th>
-                            <th className="px-3 sm:px-5 py-3.5 text-left">HS Code</th>
-                            <th className="px-3 sm:px-5 py-3.5 text-right">Consumption (Net IOR)</th>
-                            <th className="px-3 sm:px-5 py-3.5 text-right">Wastages</th>
-                            <th className="px-3 sm:px-5 py-3.5 text-right">Total (Gross IOR)</th>
-                            <th className="px-3 sm:px-5 py-3.5 text-right">%age</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200 text-slate-900 font-medium">
-                          {(selectedCertObject.items || selectedCertObject.certificateItems || []).map((item: any, idx: number) => {
-                            const description = item.itemDescription || item.particulars || item.description || 'Certificate Item';
-                            const hsCode = item.hsCode || item.hs_code || 'N/A';
-                            const qty = item.requirementQty ?? item.quantity ?? 0;
-                            const wastQty = item.wastageQty ?? 0;
-                            const inputWast = item.inputWithWastage ?? (Number(qty) + Number(wastQty));
-                            const wastage = item.wastagePct ?? 0;
-                            const isItemSel = selectedCertItem?.id === item.id;
-
-                            return (
-                              <tr 
-                                key={item.id || idx} 
-                                onClick={() => handleSelectCertItem(item)}
-                                className={`cursor-pointer transition ${isItemSel ? 'bg-blue-50 font-black' : 'hover:bg-slate-50'}`}
-                              >
-                                <td className="px-3 sm:px-5 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
-                                  <button type="button" onClick={() => handleSelectCertItem(item)} className="text-blue-600 focus:outline-none cursor-pointer">
-                                    {isItemSel ? <CheckCircle className="w-5 h-5 text-blue-600 fill-blue-100" /> : <Circle className="w-5 h-5 text-slate-400" />}
-                                  </button>
-                                </td>
-                                <td className="px-3 sm:px-5 py-3.5 font-bold text-slate-700">{idx + 1}</td>
-                                <td className="px-3 sm:px-5 py-3.5 font-black text-slate-900">{description}</td>
-                                <td className="px-3 sm:px-5 py-3.5 font-mono font-black text-slate-900">{hsCode}</td>
-                                <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-blue-700">{formatNumber(qty, 4)}</td>
-                                <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-700">{formatNumber(wastQty, 4)}</td>
-                                <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(inputWast, 4)}</td>
-                                <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-emerald-700">{formatNumber(wastage, 2)}%</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+              {loadingCertItems ? (
+                <div className="text-center py-8 text-slate-500 font-bold text-sm">Loading certificate items automatically...</div>
+              ) : !autoLoadedCertObject || (!autoLoadedCertObject.items && !autoLoadedCertObject.certificateItems) || ((autoLoadedCertObject.items?.length || 0) === 0 && (autoLoadedCertObject.certificateItems?.length || 0) === 0) ? (
+                <div className="text-center py-8 text-slate-500 font-bold text-sm bg-slate-50 rounded-2xl border border-slate-200">
+                  No certificate items found for Cert No: <span className="font-mono font-black text-slate-800">{currentCertNumber}</span>
                 </div>
               ) : (
-                <div className="h-full min-h-[200px] bg-slate-50 border-2 border-slate-300 border-dashed rounded-2xl flex items-center justify-center p-6 text-center text-xs sm:text-sm font-bold text-slate-500">
-                  Please select any Analysis Certificate from the list to view its details here.
+                <div className="overflow-x-auto border-2 border-slate-300 rounded-2xl shadow-sm bg-white">
+                  <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
+                    <thead className="bg-slate-900 text-white font-black uppercase text-[11px] sm:text-xs tracking-wider">
+                      <tr>
+                        <th className="px-3 sm:px-5 py-3.5 w-12 text-center">Select</th>
+                        <th className="px-3 sm:px-5 py-3.5 text-left">Sr #</th>
+                        <th className="px-3 sm:px-5 py-3.5 text-left">Item Description</th>
+                        <th className="px-3 sm:px-5 py-3.5 text-left">HS Code</th>
+                        <th className="px-3 sm:px-5 py-3.5 text-left">UOM</th>
+                        <th className="px-3 sm:px-5 py-3.5 text-right">Requirement (Net IOR)</th>
+                        <th className="px-3 sm:px-5 py-3.5 text-right">Wastage (KG)</th>
+                        <th className="px-3 sm:px-5 py-3.5 text-right">Input w/ Wastage</th>
+                        <th className="px-3 sm:px-5 py-3.5 text-right">Wastage %</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 text-slate-900 font-medium">
+                      {(autoLoadedCertObject.items || autoLoadedCertObject.certificateItems || []).map((item: any, idx: number) => {
+                        const description = item.itemDescription || item.particulars || item.description || 'Certificate Item';
+                        const hsCode = item.hsCode || item.hs_code || 'N/A';
+                        const uom = item.unit || item.uom || 'KG';
+                        const qty = item.requirementQty ?? item.quantity ?? 0;
+                        const wastQty = item.wastageQty ?? 0;
+                        const inputWast = item.inputWithWastage ?? (Number(qty) + Number(wastQty));
+                        const wastage = item.wastagePct ?? 0;
+                        const isItemSel = selectedCertItem?.id === item.id;
+
+                        return (
+                          <tr 
+                            key={item.id || idx} 
+                            onClick={() => handleSelectCertItem(item)}
+                            className={`cursor-pointer transition ${isItemSel ? 'bg-blue-50 font-black' : 'hover:bg-slate-50'}`}
+                          >
+                            <td className="px-3 sm:px-5 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+                              <button type="button" onClick={() => handleSelectCertItem(item)} className="text-blue-600 focus:outline-none cursor-pointer">
+                                {isItemSel ? <CheckCircle className="w-5 h-5 text-blue-600 fill-blue-100" /> : <Circle className="w-5 h-5 text-slate-400" />}
+                              </button>
+                            </td>
+                            <td className="px-3 sm:px-5 py-3.5 font-bold text-slate-700">{idx + 1}</td>
+                            <td className="px-3 sm:px-5 py-3.5 font-black text-slate-900">{description}</td>
+                            <td className="px-3 sm:px-5 py-3.5 font-mono font-black text-slate-900">{hsCode}</td>
+                            <td className="px-3 sm:px-5 py-3.5 font-mono font-black text-slate-700">{uom}</td>
+                            <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-blue-700">{formatNumber(qty, 4)}</td>
+                            <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-700">{formatNumber(wastQty, 4)}</td>
+                            <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(inputWast, 4)}</td>
+                            <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-emerald-700">{formatNumber(wastage, 2)}%</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
-          </div>
-        </div>
+          )}
 
-      </div>
-    )}
+        </div>
+      )}
 
     {/* --- AUTOMATED CONSUMPTION & RECONCILIATION SUMMARY CARD --- */}
-    {selectedExportItem && selectedCertItem && (
+    {selectedExportItem && selectedImportItem && selectedCertItem && (
       <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-2xl space-y-6 mt-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-200 pb-4 gap-4">
           <div className="flex items-center gap-3">
@@ -1638,9 +1580,9 @@ export default function InputOutputDetailsPage() {
               <span className="text-[11px] font-black text-blue-800 uppercase tracking-wider block">Calculated Export Value</span>
               <span className="font-mono font-black text-blue-700 text-base block">
                 {formatNumber(
-                  (Number(editingExportQtyItem.qtyOfExports ?? 1) > 0 
-                    ? (Number(editingExportQtyItem.valueOfeExports ?? 0) / Number(editingExportQtyItem.qtyOfExports ?? 1)) * Number(tempExportQtyVal || 0)
-                    : Number(editingExportQtyItem.valueOfeExports ?? 0)), 
+                  (Number(editingExportQtyItem.qtyOfExports ?? editingExportQtyItem.quantity ?? 1) > 0 
+                    ? (Number(editingExportQtyItem.valueOfeExports ?? editingExportQtyItem.fobValueVal ?? 0) / Number(editingExportQtyItem.qtyOfExports ?? editingExportQtyItem.quantity ?? 1)) * Number(tempExportQtyVal || 0)
+                    : Number(editingExportQtyItem.valueOfeExports ?? editingExportQtyItem.fobValueVal ?? 0)), 
                   2
                 )} Rs.
               </span>

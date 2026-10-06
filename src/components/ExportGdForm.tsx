@@ -52,7 +52,7 @@ export default function ExportGdForm() {
   const [manualGdNumber, setManualGdNumber] = useState('');
   const [manualGdDate, setManualGdDate] = useState('');
   const [manualItems, setManualItems] = useState([
-    { description: '', hsCode: '', quantity: '', uom: 'KG', fobValue: '' }
+    { description: '', hsCode: '', quantity: '', uom: 'KG', fobValue: '', analysisCertNo: '' }
   ]);
   const [isSavingManual, setIsSavingManual] = useState(false);
 
@@ -152,9 +152,27 @@ export default function ExportGdForm() {
         detectedExporter = detectedExporter.replace(/^M\/S[:\s]*/i, '').trim();
         setExtractedPartyName(detectedExporter || 'SHIWANI TEXTILE');
 
-        const parsedItems = [];
+        let headerRowIdx = -1;
+        let certColIdx = -1;
+        for (let r = 0; r < Math.min(data.length, 15); r++) {
+          const row = data[r];
+          if (row) {
+            for (let c = 0; c < row.length; c++) {
+              const val = String(row[c] || '').toUpperCase();
+              if (val.includes('CERTIFICATE') || val.includes('ANALYSIS') || val.includes('CERT #') || val.includes('CERT NO')) {
+                headerRowIdx = r;
+                certColIdx = c;
+                break;
+              }
+            }
+          }
+          if (certColIdx !== -1) break;
+        }
 
-        for (let i = 2; i < data.length; i++) {
+        const parsedItems = [];
+        const startRow = headerRowIdx !== -1 ? headerRowIdx + 1 : 2;
+
+        for (let i = startRow; i < data.length; i++) {
           const row = data[i];
           if (row && row.length > 0) {
             let gdNumber = '';
@@ -164,44 +182,26 @@ export default function ExportGdForm() {
             let qty = 0;
             let uom = 'KG';
             let value = 0;
+            let analysisCertNo = '';
 
             const nonEmpCols = row.filter((cell: any) => String(cell || '').trim() !== '');
             if (nonEmpCols.length < 3) continue;
 
-            for (let c = 0; c < row.length; c++) {
-              const val = String(row[c] || '').trim();
-              if (!val || val === 'PARTICULARS' || val === 'GD NO.' || val === 'DATE') continue;
+            gdNumber = String(row[0] || '').trim();
+            gdDateVal = String(row[1] || '').trim();
+            particulars = String(row[2] || '').trim();
+            hsCode = String(row[3] || '').trim();
+            qty = Number(row[4] || 0);
+            uom = String(row[5] || 'KG').trim();
+            value = Number(row[6] || 0);
 
-              if (!gdNumber && (val.includes('-') || val.length > 6) && !val.includes('/') && !val.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                if (!val.toUpperCase().includes('FABRIC') && !val.toUpperCase().includes('TAPE') && !val.toUpperCase().includes('YARN')) {
-                  gdNumber = val;
-                  continue;
-                }
-              }
-
-              if (!gdDateVal && (val.match(/^\d{2}[-/]\d{2}[-/]\d{4}$/) || val.match(/^\d{4}[-/]\d{2}[-/]\d{2}$/))) {
-                gdDateVal = val;
-                continue;
-              }
+            if (certColIdx !== -1 && row[certColIdx] !== undefined) {
+              analysisCertNo = String(row[certColIdx] || '').trim();
+            } else if (row[7] !== undefined) {
+              analysisCertNo = String(row[7] || '').trim();
             }
 
-            if (!gdNumber && row[0]) gdNumber = String(row[0]).trim();
-            if (!gdDateVal && row[1]) gdDateVal = String(row[1]).trim();
-            particulars = String(row[2] || row[1] || '').trim();
-            hsCode = String(row[3] || row[2] || '').trim();
-            qty = Number(row[4] || row[3] || 0);
-            uom = String(row[5] || row[4] || 'KG').trim();
-            value = Number(row[6] || row[5] || row[4] || 0);
-
-            if (particulars === gdNumber || particulars === gdDateVal) {
-              particulars = String(row[3] || row[2] || '').trim();
-              hsCode = String(row[4] || row[3] || '').trim();
-              qty = Number(row[5] || row[4] || 0);
-              uom = String(row[6] || row[5] || 'KG').trim();
-              value = Number(row[7] || row[6] || 0);
-            }
-
-            if (particulars && particulars !== 'PARTICULARS' && particulars !== 'GD NO.' && particulars !== 'DATE') {
+            if (particulars && particulars.toUpperCase() !== 'PARTICULARS' && particulars.toUpperCase() !== 'GD NO.' && particulars.toUpperCase() !== 'DATE') {
               let formattedDate = gdDateVal || new Date().toISOString();
               if (gdDateVal && gdDateVal.includes('/')) {
                 const dateParts = gdDateVal.split('/');
@@ -220,6 +220,7 @@ export default function ExportGdForm() {
                 quantity: isNaN(qty) ? 0 : qty,
                 uom: uom || 'KG',
                 fobValueVal: isNaN(value) ? 0 : value,
+                analysisCertNo: analysisCertNo || '',
                 destinationCountry: 'China',
                 portOfLoading: 'Port Qasim Karachi',
               });
@@ -239,7 +240,7 @@ export default function ExportGdForm() {
   const handleAddManualItemRow = () => {
     setManualItems(prev => [
       ...prev,
-      { description: '', hsCode: '', quantity: '', uom: 'KG', fobValue: '' }
+      { description: '', hsCode: '', quantity: '', uom: 'KG', fobValue: '', analysisCertNo: '' }
     ]);
   };
 
@@ -260,7 +261,7 @@ export default function ExportGdForm() {
     setSelectedManualPartyId('');
     setManualGdNumber('');
     setManualGdDate('');
-    setManualItems([{ description: '', hsCode: '', quantity: '', uom: 'KG', fobValue: '' }]);
+    setManualItems([{ description: '', hsCode: '', quantity: '', uom: 'KG', fobValue: '', analysisCertNo: '' }]);
     setActiveTab('auto');
   };
 
@@ -290,6 +291,7 @@ export default function ExportGdForm() {
           quantity: Number(item.quantity) || 0,
           unit: item.uom || 'KG',
           fobValueVal: Number(item.fobValue) || 0,
+          analysisCertNo: item.analysisCertNo || '',
         }))
       };
 
@@ -347,6 +349,7 @@ export default function ExportGdForm() {
         const payload = {
           gdNumber: gdNo,
           gdDate: gdItems[0]?.gdDate || new Date().toISOString(),
+          partyName: extractedPartyName,
           partyId: partyId,
           destinationCountry: 'China',
           portOfLoading: 'Port Qasim Karachi',
@@ -357,7 +360,8 @@ export default function ExportGdForm() {
             quantity: it.quantity,
             fobValueVal: it.fobValueVal,
             unit: it.uom || 'KG',
-            gdDate: it.gdDate
+            gdDate: it.gdDate,
+            analysisCertNo: it.analysisCertNo || ''
           })),
         };
 
@@ -369,7 +373,7 @@ export default function ExportGdForm() {
 
         const json = await res.json();
         if (!json.success) {
-          console.warn(`GD ${gdNo} note:`, json.error);
+          throw new Error(json.error || `Failed to save GD ${gdNo}`);
         }
       }
 
@@ -378,6 +382,7 @@ export default function ExportGdForm() {
       setExtractedPartyName('');
       fetchData();
     } catch (err: any) {
+      console.error('Submission error details:', err);
       showNotification('error', 'Submission failed: ' + err.message);
     } finally {
       setLoading(false);
@@ -397,6 +402,40 @@ export default function ExportGdForm() {
           const json = await res.json();
           if (json.success) {
             showNotification('success', 'Export GD deleted successfully!');
+            fetchData();
+          } else {
+            showNotification('error', 'Error deleting: ' + (json.error || 'Failed'));
+          }
+        } catch (err: any) {
+          showNotification('error', 'Delete failed: ' + err.message);
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
+  };
+
+  // Party-wise bulk delete handler
+  const handleDeletePartyGds = () => {
+    if (!filterPartyId) {
+      showNotification('error', 'Please select a party from the "Filter by Party" dropdown first.');
+      return;
+    }
+    const selectedPartyObj = parties.find(p => p.id === filterPartyId);
+    const partyNameStr = selectedPartyObj ? selectedPartyObj.companyName : 'Selected Party';
+
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete All Export GDs for Party',
+      message: `Are you sure you want to delete ALL Export GDs for ${partyNameStr}? This action cannot be undone.`,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/v1/exports?partyId=${encodeURIComponent(filterPartyId)}`, {
+            method: 'DELETE',
+          });
+          const json = await res.json();
+          if (json.success) {
+            showNotification('success', `All Export GDs for ${partyNameStr} deleted successfully!`);
             fetchData();
           } else {
             showNotification('error', 'Error deleting: ' + (json.error || 'Failed'));
@@ -445,7 +484,8 @@ export default function ExportGdForm() {
                 <th>HS Code</th>
                 <th class="text-right">Quantity</th>
                 <th>UOM</th>
-                <th class="text-right">FOB Value</th>
+                <th class="text-right">Value</th>
+                <th>Analysis Certificate No.</th>
               </tr>
             </thead>
             <tbody>
@@ -459,6 +499,7 @@ export default function ExportGdForm() {
                   <td class="text-right">${formatNumber(item.quantity, 0)}</td>
                   <td>${item.uom || item.unit || 'KG'}</td>
                   <td class="text-right">${formatNumber(item.fobValueVal, 2)}</td>
+                  <td>${item.analysisCertNo || item.certNumber || item.analysisCertificateNo || ''}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -564,7 +605,7 @@ export default function ExportGdForm() {
             </div>
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-white leading-tight">Exports Management</h1>
             <p className="text-xs sm:text-sm text-blue-200 font-medium max-w-2xl">
-              Upload Excel sheets to AWS S3 for auto-extraction with separate GD No & Date columns or use manual entry forms.
+              Upload Excel sheets to AWS S3 for auto-extraction with Analysis Certificate No. or use manual entry forms.
             </p>
           </div>
 
@@ -631,7 +672,8 @@ export default function ExportGdForm() {
                         <th className="px-4 py-3.5 text-left">HS Code</th>
                         <th className="px-4 py-3.5 text-right">Quantity</th>
                         <th className="px-4 py-3.5 text-left">UOM</th>
-                        <th className="px-4 py-3.5 text-right">FOB Value</th>
+                        <th className="px-4 py-3.5 text-right">Value</th>
+                        <th className="px-4 py-3.5 text-left">Analysis Certificate No.</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 text-slate-800 font-medium">
@@ -644,6 +686,7 @@ export default function ExportGdForm() {
                           <td className="px-4 py-3.5 text-right font-mono font-black text-slate-900 text-xs sm:text-sm">{formatNumber(item.quantity, 0)}</td>
                           <td className="px-4 py-3.5 font-black text-slate-900 text-xs sm:text-sm">{item.uom || 'KG'}</td>
                           <td className="px-4 py-3.5 text-right font-mono font-black text-slate-900 text-xs sm:text-sm">{formatNumber(item.fobValueVal, 2)}</td>
+                          <td className="px-4 py-3.5 font-mono font-black text-slate-800 text-xs sm:text-sm">{item.analysisCertNo || '-'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -738,7 +781,7 @@ export default function ExportGdForm() {
             <h3 className="text-xs sm:text-sm font-black uppercase tracking-widest text-slate-500">GD Line Items Matrix</h3>
             {manualItems.map((item, idx) => (
               <div key={idx} className="bg-slate-50 border-2 border-slate-300 p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end shadow-sm">
-                <div className="sm:col-span-2 lg:col-span-4 space-y-1.5">
+                <div className="sm:col-span-2 lg:col-span-3 space-y-1.5">
                   <label className="block text-[11px] text-slate-600 uppercase font-black">Description *</label>
                   <input
                     type="text"
@@ -780,7 +823,7 @@ export default function ExportGdForm() {
                   />
                 </div>
                 <div className="sm:col-span-1 lg:col-span-2 space-y-1.5">
-                  <label className="block text-[11px] text-slate-600 uppercase font-black">FOB Value *</label>
+                  <label className="block text-[11px] text-slate-600 uppercase font-black">Value *</label>
                   <input
                     type="number"
                     placeholder="0.00"
@@ -790,7 +833,17 @@ export default function ExportGdForm() {
                     className="w-full p-3 bg-white border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-black text-slate-900 font-mono focus:outline-none focus:border-blue-600"
                   />
                 </div>
-                <div className="sm:col-span-2 lg:col-span-1 text-right sm:text-center">
+                <div className="sm:col-span-2 lg:col-span-1.5 space-y-1.5">
+                  <label className="block text-[11px] text-slate-600 uppercase font-black">Analysis Cert #</label>
+                  <input
+                    type="text"
+                    placeholder="Cert No..."
+                    value={item.analysisCertNo}
+                    onChange={(e) => handleManualItemChange(idx, 'analysisCertNo', e.target.value)}
+                    className="w-full p-3 bg-white border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 font-mono focus:outline-none focus:border-blue-600"
+                  />
+                </div>
+                <div className="sm:col-span-2 lg:col-span-0.5 text-right sm:text-center">
                   <button
                     type="button"
                     onClick={() => handleRemoveManualItemRow(idx)}
@@ -834,7 +887,7 @@ export default function ExportGdForm() {
           </div>
         </div>
 
-        {/* Filter Controls Bar */}
+        {/* Filter Controls Bar with Delete Party GDs Option */}
         <div className="bg-slate-50 border-2 border-slate-300 p-4 sm:p-5 rounded-2xl flex flex-wrap items-end gap-4 shadow-sm">
           <div className="flex-1 min-w-[220px] space-y-1.5">
             <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700">Filter by Party</label>
@@ -870,7 +923,7 @@ export default function ExportGdForm() {
             />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={handlePrintFilteredReport}
               disabled={filteredExports.length === 0}
@@ -878,6 +931,14 @@ export default function ExportGdForm() {
               title="Print Filtered Results"
             >
               <Printer className="w-4 h-4" /> Print
+            </button>
+            <button
+              onClick={handleDeletePartyGds}
+              disabled={!filterPartyId || filteredExports.length === 0}
+              className="bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm font-black uppercase tracking-wider py-3 px-4 rounded-xl transition flex items-center justify-center gap-1.5 shadow cursor-pointer disabled:opacity-50 whitespace-nowrap"
+              title="Delete All Export GDs for Selected Party"
+            >
+              <Trash2 className="w-4 h-4" /> Delete Party GDs
             </button>
             <button
               onClick={() => { setFilterPartyId(''); setFilterFromDate(''); setFilterToDate(''); setHistorySearch(''); }}
@@ -1010,6 +1071,7 @@ export default function ExportGdForm() {
                     <th className="px-4 py-3.5 text-right">Quantity</th>
                     <th className="px-4 py-3.5 text-left">UOM</th>
                     <th className="px-4 py-3.5 text-right">Value</th>
+                    <th className="px-4 py-3.5 text-left">Analysis Certificate No.</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 text-slate-900 font-medium">
@@ -1019,11 +1081,14 @@ export default function ExportGdForm() {
                       <td className="px-4 py-3.5 font-mono text-xs sm:text-sm font-black text-blue-700">
                         {item.gdNumber || selectedGdItems.gdNumber}
                       </td>
-                      <td className="px-4 py-3.5 font-black text-slate-900 text-xs sm:text-sm">{item.itemDescription}</td>
+                      <td className="px-4 py-4 font-black text-slate-900 text-xs sm:text-sm">{item.itemDescription}</td>
                       <td className="px-4 py-3.5 text-slate-900 font-mono font-black text-xs sm:text-sm">{item.hsCode}</td>
                       <td className="px-4 py-3.5 text-right font-mono font-black text-slate-900 text-xs sm:text-sm">{formatNumber(item.quantity, 0)}</td>
                       <td className="px-4 py-3.5 font-black text-slate-900 text-xs sm:text-sm">{item.uom || item.unit || 'KG'}</td>
                       <td className="px-4 py-3.5 text-right font-mono font-black text-slate-900 text-xs sm:text-sm">{formatNumber(item.fobValueVal, 2)}</td>
+                      <td className="px-4 py-3.5 font-mono font-black text-blue-700 text-xs sm:text-sm">
+                        {item.analysisCertNo || item.certNumber || item.analysisCertificateNo || '-'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
