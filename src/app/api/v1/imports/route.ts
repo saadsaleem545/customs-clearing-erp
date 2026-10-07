@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
         },
         items: true,
         _count: {
-          select: { documents: true, expenses: true },
+          select: { documents: true },
         },
       },
     });
@@ -59,7 +59,6 @@ export async function POST(req: NextRequest) {
       countryOfOrigin,
       portOfDischarge,
       blNumber,
-      status,
       remarks,
       items,
     } = body;
@@ -135,7 +134,6 @@ export async function POST(req: NextRequest) {
           countryOfOrigin: countryOfOrigin || 'China',
           portOfDischarge: portOfDischarge || 'KICT Karachi',
           blNumber,
-          status: status || 'CLEARED',
           totalAssessableValue: totalAssessableVal,
           totalDutyTaxes: totalDutyTaxVal,
           remarks,
