@@ -17,7 +17,6 @@ export async function PUT(
       countryOfOrigin,
       portOfDischarge,
       blNumber,
-      status,
       remarks,
       items,
     } = body;
@@ -96,7 +95,6 @@ export async function PUT(
           countryOfOrigin: countryOfOrigin || 'China',
           portOfDischarge: portOfDischarge || 'KICT Karachi',
           blNumber,
-          status: status || 'CLEARED',
           totalAssessableValue: totalAssessableVal,
           totalDutyTaxes: totalDutyTaxVal,
           remarks,
@@ -167,4 +165,4 @@ export async function DELETE(
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
-} 
+}
