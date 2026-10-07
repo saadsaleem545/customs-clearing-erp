@@ -9,45 +9,58 @@ const JWT_SECRET = new TextEncoder().encode(
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, password } = await req.json();
+    const body = await req.json();
+    const { email, password } = body;
 
     if (!email || !password) {
-      return NextResponse.json({ success: false, message: 'Please enter both email and password.' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: 'Please enter both email and password.' },
+        { status: 400 }
+      );
     }
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user || !user.isActive) {
-      return NextResponse.json({ success: false, message: 'Invalid credentials or inactive account.' }, { status: 401 });
+      return NextResponse.json(
+        { success: false, message: 'Invalid credentials or inactive account.' },
+        { status: 401 }
+      );
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
-      return NextResponse.json({ success: false, message: 'Invalid email or password.' }, { status: 401 });
+      return NextResponse.json(
+        { success: false, message: 'Invalid email or password.' },
+        { status: 401 }
+      );
     }
 
     // Generate JWT token matching dashboard layout expectations
-    const token = await new SignJWT({ 
-      id: user.id, 
-      email: user.email, 
-      name: user.name, 
-      role: user.role 
+    const token = await new SignJWT({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
     })
       .setProtectedHeader({ alg: 'HS256' })
       .setExpirationTime('7d')
       .sign(JWT_SECRET);
 
-    const response = NextResponse.json({ 
-      success: true, 
-      message: 'Sign in successful!',
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role
-      }
-    }, { status: 200 });
+    const response = NextResponse.json(
+      {
+        success: true,
+        message: 'Sign in successful!',
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+        },
+      },
+      { status: 200 }
+    );
 
-    // Set cookie name as 'auth_token' to satisfy dashboard layout check
+    // Set auth_token cookie for dashboard access
     response.cookies.set({
       name: 'auth_token',
       value: token,
@@ -59,9 +72,11 @@ export async function POST(req: NextRequest) {
     });
 
     return response;
-
   } catch (error: any) {
     console.error('Login error:', error);
-    return NextResponse.json({ success: false, message: error.message || 'An error occurred during sign in.' }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: error.message || 'An error occurred during sign in.' },
+      { status: 500 }
+    );
   }
 }
