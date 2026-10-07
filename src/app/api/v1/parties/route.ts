@@ -36,8 +36,6 @@ export async function GET(req: NextRequest) {
           select: {
             importGds: true,
             exportGds: true,
-            invoices: true,
-            reconciliations: true,
           },
         },
       },
