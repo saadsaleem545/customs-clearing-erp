@@ -196,7 +196,7 @@ export default function ExportGdForm() {
             particulars = String(row[2] || '').trim();
             hsCode = String(row[3] || '').trim();
             qty = Number(row[4] || 0);
-            uom = String(row[5] || 'KG').trim();
+            uom = String(row[5] || 'KG').trim(); // Yahan Excel column 5 se UOM dynamically read ho raha hai
             value = Number(row[6] || 0);
 
             if (certColIdx !== -1 && row[certColIdx] !== undefined) {
@@ -363,7 +363,7 @@ export default function ExportGdForm() {
             hsCode: it.hsCode,
             quantity: it.quantity,
             fobValueVal: it.fobValueVal,
-            unit: it.uom || 'KG',
+            unit: it.uom || it.unit || 'KG',
             gdDate: it.gdDate,
             analysisCertNo: it.analysisCertNo || ''
           })),
@@ -419,7 +419,6 @@ export default function ExportGdForm() {
     });
   };
 
-  // Party-wise bulk delete handler
   const handleDeletePartyGds = () => {
     if (!filterPartyId) {
       showNotification('error', 'Please select a party from the "Filter by Party" dropdown first.');
@@ -551,7 +550,6 @@ export default function ExportGdForm() {
     return searchCondition && partyIdMatch && dateMatch;
   });
 
-  // Pagination calculation for filtered exports
   const totalPages = Math.ceil(filteredExports.length / itemsPerPage);
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -591,7 +589,6 @@ export default function ExportGdForm() {
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
       `}</style>
 
-      {/* FLOATING TOAST NOTIFICATION */}
       {notification.show && (
         <div className="fixed top-6 right-6 z-50 animate-bounce">
           <div className={`flex items-center gap-3 px-5 py-4 rounded-2xl shadow-2xl border-2 text-white font-black text-xs sm:text-sm uppercase tracking-wider ${
@@ -606,7 +603,6 @@ export default function ExportGdForm() {
         </div>
       )}
 
-      {/* Top Banner Header */}
       <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl shadow-xl overflow-hidden w-full">
         <div className="bg-gradient-to-r from-blue-700 via-blue-900 to-slate-950 p-6 sm:p-8 text-white flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
           <div className="space-y-2">
@@ -638,7 +634,6 @@ export default function ExportGdForm() {
         </div>
       </div>
 
-      {/* --- TAB 1: AUTO EXCEL UPLOAD BOX --- */}
       {activeTab === 'auto' && (
         <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6 w-full">
           <div className="flex items-center justify-between border-b border-slate-200 pb-4">
@@ -694,7 +689,8 @@ export default function ExportGdForm() {
                           <td className="px-4 py-3.5 font-black text-slate-900 text-xs sm:text-sm">{item.itemDescription}</td>
                           <td className="px-4 py-3.5 text-slate-900 font-mono font-black text-xs sm:text-sm">{item.hsCode}</td>
                           <td className="px-4 py-3.5 text-right font-mono font-black text-slate-900 text-xs sm:text-sm">{formatNumber(item.quantity, 0)}</td>
-                          <td className="px-4 py-3.5 font-black text-slate-900 text-xs sm:text-sm">{item.uom || 'KG'}</td>
+                          {/* Yahan UOM ke liye dynamically item.uom ya item.unit check ho raha hai */}
+                          <td className="px-4 py-3.5 font-black text-slate-900 text-xs sm:text-sm">{item.uom || item.unit || 'KG'}</td>
                           <td className="px-4 py-3.5 text-right font-mono font-black text-slate-900 text-xs sm:text-sm">{formatNumber(item.fobValueVal, 2)}</td>
                           <td className="px-4 py-3.5 font-mono font-black text-slate-800 text-xs sm:text-sm">{item.analysisCertNo || '-'}</td>
                         </tr>
@@ -717,7 +713,6 @@ export default function ExportGdForm() {
         </div>
       )}
 
-      {/* --- TAB 2: MANUAL ENTRY FORM BOX --- */}
       {activeTab === 'manual' && (
         <form onSubmit={handleSaveManualExport} className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6 w-full">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
@@ -888,7 +883,6 @@ export default function ExportGdForm() {
         </form>
       )}
 
-      {/* Saved Exports History Section */}
       <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6 w-full">
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-slate-200 pb-5">
           <div>
@@ -897,7 +891,6 @@ export default function ExportGdForm() {
           </div>
         </div>
 
-        {/* Filter Controls Bar with Delete Party GDs Option */}
         <div className="bg-slate-50 border-2 border-slate-300 p-4 sm:p-5 rounded-2xl flex flex-wrap items-end gap-4 shadow-sm">
           <div className="flex-1 min-w-[220px] space-y-1.5">
             <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700">Filter by Party</label>
@@ -1008,7 +1001,6 @@ export default function ExportGdForm() {
               </table>
             </div>
 
-            {/* Pagination Controls Bar */}
             <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-100 p-3.5 rounded-2xl border-2 border-slate-300 shadow-sm">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-black text-slate-800 uppercase tracking-wider">Go to page</span>
@@ -1089,12 +1081,10 @@ export default function ExportGdForm() {
         )}
       </div>
 
-      {/* Footer */}
       <footer className="bg-gradient-to-r from-blue-700 via-blue-900 to-slate-950 text-blue-200 text-center py-4 text-xs sm:text-sm font-bold border-t border-blue-900 w-full shadow-inner rounded-2xl">
         &copy; 2026 Customs Clearing ERP &bull; Powered by EFS Advanced Compliance Engine. All rights reserved.
       </footer>
 
-      {/* CUSTOM PROFESSIONAL CONFIRMATION MODAL */}
       {confirmModal.isOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-6 shadow-2xl">
@@ -1123,7 +1113,6 @@ export default function ExportGdForm() {
         </div>
       )}
 
-      {/* Modal Popup */}
       {selectedGdItems && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4">
           <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-3xl max-w-5xl w-full p-4 sm:p-8 shadow-2xl space-y-6 max-h-[85vh] overflow-y-auto">
@@ -1174,6 +1163,7 @@ export default function ExportGdForm() {
                       <td className="px-4 py-4 font-black text-slate-900 text-xs sm:text-sm">{item.itemDescription}</td>
                       <td className="px-4 py-3.5 text-slate-900 font-mono font-black text-xs sm:text-sm">{item.hsCode}</td>
                       <td className="px-4 py-3.5 text-right font-mono font-black text-slate-900 text-xs sm:text-sm">{formatNumber(item.quantity, 0)}</td>
+                      {/* Modal ke andar bhi dynamic UOM check lagadiya hai */}
                       <td className="px-4 py-3.5 font-black text-slate-900 text-xs sm:text-sm">{item.uom || item.unit || 'KG'}</td>
                       <td className="px-4 py-3.5 text-right font-mono font-black text-slate-900 text-xs sm:text-sm">{formatNumber(item.fobValueVal, 2)}</td>
                       <td className="px-4 py-3.5 font-mono font-black text-blue-700 text-xs sm:text-sm">

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { Decimal } from '@prisma/client/runtime/library';
 
-// GET /api/v1/exports (Optimized with Analysis Certificate relation mapping)
+// GET /api/v1/exports (Optimized with Analysis Certificate relation mapping & dynamic UOM)
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -33,7 +33,8 @@ export async function GET(req: NextRequest) {
         itemDescription: it.exportParticulars || '',
         hsCode: it.exportHsCode || '',
         quantity: Number(it.qtyOfExports || 0),
-        uom: 'KG',
+        // Dynamic UOM mapping (database column unit / uom or fallback to 'KG')
+        uom: it.unit || it.uom || 'KG',
         fobValueVal: Number(it.valueOfeExports || 0),
         analysisCertNo: rec.analysisCertificate?.certificateNumber || '',
       }))
@@ -141,13 +142,14 @@ export async function POST(req: NextRequest) {
           where: { exportGdNumber: currentGdNum },
         });
 
-        // Strictly map only valid database columns, stripping out any extra fields like analysisCertNo
         const formattedItemsData = gdItems.map((item: any, idx: number) => ({
           serialNo: idx + 1,
           exportHsCode: item.hsCode || item.exportHsCode || '',
           exportParticulars: item.itemDescription || item.exportParticulars || '',
           qtyOfExports: new Decimal(item.quantity || item.qtyOfExports || 0),
           valueOfeExports: new Decimal(item.fobValueVal || item.valueOfeExports || 0),
+          // Unit save karne ke liye agar schema mein field ho (jaise unit ya uom), toh yeh save karega:
+          unit: item.uom || item.unit || 'KG',
           importHsCode: '',
           inputValue: new Decimal(0),
           wastageValue: new Decimal(0),
