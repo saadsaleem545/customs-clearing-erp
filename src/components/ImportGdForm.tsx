@@ -536,7 +536,6 @@ export default function ImportGdForm() {
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
       `}</style>
 
-      {/* FLOATING TOAST NOTIFICATION */}
       {notification.show && (
         <div className="fixed top-6 right-6 z-50 animate-bounce">
           <div className={`flex items-center gap-3 px-5 py-4 rounded-2xl shadow-2xl border-2 text-white font-black text-xs sm:text-sm uppercase tracking-wider ${
@@ -551,7 +550,6 @@ export default function ImportGdForm() {
         </div>
       )}
 
-      {/* Top Banner Header */}
       <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl shadow-xl overflow-hidden w-full">
         <div className="bg-gradient-to-r from-blue-700 via-blue-900 to-slate-950 p-6 sm:p-8 text-white flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
           <div className="space-y-2">
@@ -583,7 +581,6 @@ export default function ImportGdForm() {
         </div>
       </div>
 
-      {/* --- TAB 1: AUTO EXCEL UPLOAD BOX --- */}
       {activeTab === 'auto' && (
         <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6 w-full">
           <div className="flex items-center justify-between border-b border-slate-200 pb-4">
@@ -660,7 +657,6 @@ export default function ImportGdForm() {
         </div>
       )}
 
-      {/* --- TAB 2: MANUAL ENTRY FORM BOX --- */}
       {activeTab === 'manual' && (
         <form onSubmit={handleSaveManualImport} className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6 w-full">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
@@ -832,6 +828,18 @@ export default function ImportGdForm() {
 
         {/* Filter Controls Bar */}
         <div className="bg-slate-50 border-2 border-slate-300 p-4 sm:p-5 rounded-2xl flex flex-wrap items-end gap-4 shadow-sm">
+          {/* Search GD Number Input Field Added Here */}
+          <div className="flex-1 min-w-[220px] space-y-1.5">
+            <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700">Search GD Number</label>
+            <input
+              type="text"
+              placeholder="Type Import GD No..."
+              value={historySearch}
+              onChange={(e) => { setHistorySearch(e.target.value); setCurrentPage(1); }}
+              className="w-full p-3 bg-white border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 placeholder-slate-400 font-mono focus:outline-none focus:border-blue-600 shadow-sm"
+            />
+          </div>
+
           <div className="flex-1 min-w-[220px] space-y-1.5">
             <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700">Filter by Party</label>
             <select
@@ -866,7 +874,7 @@ export default function ImportGdForm() {
             />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={handlePrintFilteredReport}
               disabled={filteredImports.length === 0}
@@ -887,7 +895,7 @@ export default function ImportGdForm() {
 
         {filteredImports.length === 0 ? (
           <p className="text-slate-500 text-sm py-12 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-300 font-bold">
-            {savedImports.length === 0 ? 'No import records found in database yet.' : 'No matching import GD found for selected party or date range.'}
+            {savedImports.length === 0 ? 'No import records found in database yet.' : 'No matching import GD found for selected search query, party or date range.'}
           </p>
         ) : (
           <div className="space-y-4">
@@ -1021,7 +1029,6 @@ export default function ImportGdForm() {
         &copy; 2026 Customs Clearing ERP &bull; Powered by EFS Advanced Compliance Engine. All rights reserved.
       </footer>
 
-      {/* CUSTOM PROFESSIONAL CONFIRMATION MODAL */}
       {confirmModal.isOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-6 shadow-2xl">
@@ -1050,7 +1057,6 @@ export default function ImportGdForm() {
         </div>
       )}
 
-      {/* Modal Popup */}
       {selectedGdItems && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4">
           <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-3xl max-w-5xl w-full p-4 sm:p-8 shadow-2xl space-y-6 max-h-[85vh] overflow-y-auto">

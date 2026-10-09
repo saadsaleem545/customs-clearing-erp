@@ -196,7 +196,7 @@ export default function ExportGdForm() {
             particulars = String(row[2] || '').trim();
             hsCode = String(row[3] || '').trim();
             qty = Number(row[4] || 0);
-            uom = String(row[5] || 'KG').trim(); // Yahan Excel column 5 se UOM dynamically read ho raha hai
+            uom = String(row[5] || 'KG').trim();
             value = Number(row[6] || 0);
 
             if (certColIdx !== -1 && row[certColIdx] !== undefined) {
@@ -689,7 +689,6 @@ export default function ExportGdForm() {
                           <td className="px-4 py-3.5 font-black text-slate-900 text-xs sm:text-sm">{item.itemDescription}</td>
                           <td className="px-4 py-3.5 text-slate-900 font-mono font-black text-xs sm:text-sm">{item.hsCode}</td>
                           <td className="px-4 py-3.5 text-right font-mono font-black text-slate-900 text-xs sm:text-sm">{formatNumber(item.quantity, 0)}</td>
-                          {/* Yahan UOM ke liye dynamically item.uom ya item.unit check ho raha hai */}
                           <td className="px-4 py-3.5 font-black text-slate-900 text-xs sm:text-sm">{item.uom || item.unit || 'KG'}</td>
                           <td className="px-4 py-3.5 text-right font-mono font-black text-slate-900 text-xs sm:text-sm">{formatNumber(item.fobValueVal, 2)}</td>
                           <td className="px-4 py-3.5 font-mono font-black text-slate-800 text-xs sm:text-sm">{item.analysisCertNo || '-'}</td>
@@ -892,6 +891,18 @@ export default function ExportGdForm() {
         </div>
 
         <div className="bg-slate-50 border-2 border-slate-300 p-4 sm:p-5 rounded-2xl flex flex-wrap items-end gap-4 shadow-sm">
+          {/* Search GD Number Input Field */}
+          <div className="flex-1 min-w-[220px] space-y-1.5">
+            <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700">Search GD Number</label>
+            <input
+              type="text"
+              placeholder="Type Export GD No..."
+              value={historySearch}
+              onChange={(e) => { setHistorySearch(e.target.value); setCurrentPage(1); }}
+              className="w-full p-3 bg-white border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 placeholder-slate-400 font-mono focus:outline-none focus:border-blue-600 shadow-sm"
+            />
+          </div>
+
           <div className="flex-1 min-w-[220px] space-y-1.5">
             <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700">Filter by Party</label>
             <select
@@ -955,7 +966,7 @@ export default function ExportGdForm() {
 
         {filteredExports.length === 0 ? (
           <p className="text-slate-500 text-sm py-12 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-300 font-bold">
-            {savedExports.length === 0 ? 'No export records found in database yet.' : 'No matching export GD found for selected party or date range.'}
+            {savedExports.length === 0 ? 'No export records found in database yet.' : 'No matching export GD found for selected search query, party or date range.'}
           </p>
         ) : (
           <div className="space-y-4">
@@ -1163,7 +1174,6 @@ export default function ExportGdForm() {
                       <td className="px-4 py-4 font-black text-slate-900 text-xs sm:text-sm">{item.itemDescription}</td>
                       <td className="px-4 py-3.5 text-slate-900 font-mono font-black text-xs sm:text-sm">{item.hsCode}</td>
                       <td className="px-4 py-3.5 text-right font-mono font-black text-slate-900 text-xs sm:text-sm">{formatNumber(item.quantity, 0)}</td>
-                      {/* Modal ke andar bhi dynamic UOM check lagadiya hai */}
                       <td className="px-4 py-3.5 font-black text-slate-900 text-xs sm:text-sm">{item.uom || item.unit || 'KG'}</td>
                       <td className="px-4 py-3.5 text-right font-mono font-black text-slate-900 text-xs sm:text-sm">{formatNumber(item.fobValueVal, 2)}</td>
                       <td className="px-4 py-3.5 font-mono font-black text-blue-700 text-xs sm:text-sm">
