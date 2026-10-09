@@ -24,7 +24,7 @@ export default function InputOutputDetailsPage() {
 
   // Pagination States for Statements
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5; // Har page par 5 statements dikhengi
+  const itemsPerPage = 5;
 
   const [partyImports, setPartyImports] = useState<any[]>([]);
   const [selectedGdObject, setSelectedGdObject] = useState<any>(null);
@@ -57,9 +57,7 @@ export default function InputOutputDetailsPage() {
 
   const [editingExportQtyItem, setEditingExportQtyItem] = useState<any>(null);
   const [tempExportQtyVal, setTempExportQtyVal] = useState('');
-  const [isUpdatedInModal, setIsUpdatedInModal] = useState(false);
-  const [calculatedBalancedQty, setCalculatedBalancedQty] = useState<number>(0);
-  const [calculatedBalancedVal, setCalculatedBalancedVal] = useState<number>(0);
+  const [calculatedExportVal, setCalculatedExportVal] = useState<number>(0);
 
   const [partyReconciliations, setPartyReconciliations] = useState<any[]>([]);
   const [loadingReconciliations, setLoadingReconciliations] = useState(false);
@@ -97,7 +95,6 @@ export default function InputOutputDetailsPage() {
   const exportGdNumber = selectedExportGdObject?.exportGdNumber || selectedExportGdObject?.gdNumber || selectedExportItem?.exportGdNo || 'N/A';
   const exportDesc = selectedExportItem?.exportParticulars || selectedExportItem?.itemDescription || selectedExportItem?.description || 'Export Item';
 
-  // We aggregate or take the first selected cert item for calculations if multiple cards exist, or aggregate them
   const firstSelectedCertKey = Object.keys(selectedCertItemsMap)[0];
   const activeCertItem = firstSelectedCertKey ? selectedCertItemsMap[firstSelectedCertKey] : null;
 
@@ -206,7 +203,7 @@ export default function InputOutputDetailsPage() {
 
       setPartyReconciliations(prev => [...prev, result.data]);
       showToast('Reconciliation saved successfully!');
-      setCurrentPage(1); // Reset to first page so the newly saved item is visible immediately
+      setCurrentPage(1);
 
     } catch (err: any) {
       console.error('Error saving reconciliation:', err);
@@ -326,8 +323,8 @@ export default function InputOutputDetailsPage() {
     });
   };
 
-  const handleModalUpdateClick = () => {
-    if (!editingExportQtyItem) return;
+  const handleModalSaveClick = () => {
+    if (!editingExportQtyItem || !selectedExportGdObject) return;
     const manualQty = Number(tempExportQtyVal);
     if (isNaN(manualQty)) {
       showToast('Please enter a valid quantity.', 'error');
@@ -338,23 +335,12 @@ export default function InputOutputDetailsPage() {
     const origVal = Number(editingExportQtyItem.valueOfeExports ?? editingExportQtyItem.fobValueVal ?? 0);
     const manualVal = origQty > 0 ? (origVal / origQty) * manualQty : origVal;
 
-    const balancedQty = origQty - manualQty;
-    const balancedVal = origVal - manualVal;
-
-    setCalculatedBalancedQty(balancedQty > 0 ? balancedQty : 0);
-    setCalculatedBalancedVal(balancedVal > 0 ? balancedVal : 0);
-    setIsUpdatedInModal(true);
-  };
-
-  const handleModalSaveClick = () => {
-    if (!editingExportQtyItem || !selectedExportGdObject) return;
-
     const updatedItems = selectedExportGdObject.items.map((it: any) => {
       if (it.id === editingExportQtyItem.id) {
         return { 
           ...it, 
-          qtyOfExports: calculatedBalancedQty,
-          valueOfeExports: calculatedBalancedVal 
+          qtyOfExports: manualQty,
+          valueOfeExports: manualVal 
         };
       }
       return it;
@@ -371,15 +357,15 @@ export default function InputOutputDetailsPage() {
     if (selectedExportItem?.id === editingExportQtyItem.id) {
       setSelectedExportItem({
         ...selectedExportItem,
-        qtyOfExports: calculatedBalancedQty,
-        valueOfeExports: calculatedBalancedVal
+        qtyOfExports: manualQty,
+        valueOfeExports: manualVal
       });
     }
 
     setEditingExportQtyItem(null);
     setTempExportQtyVal('');
-    setIsUpdatedInModal(false);
-    showToast('Export item permanently updated with Balanced Quantity and Balanced Value!');
+    setCalculatedExportVal(0);
+    showToast('Export item quantity and value updated successfully!');
   };
 
   const handlePrintStatement = (groupKey: string) => {
@@ -623,7 +609,6 @@ export default function InputOutputDetailsPage() {
   const handleSelectExportItem = async (item: any) => {
     setSelectedExportItem(item);
     
-    // Parse comma-separated certificate numbers (e.g., "CERT-1, CERT-2")
     const rawCertStr = item.analysisCertNo || '';
     const certList = rawCertStr.split(',').map((c: string) => c.trim()).filter(Boolean);
     setParsedCertificateNumbers(certList);
@@ -644,7 +629,6 @@ export default function InputOutputDetailsPage() {
           if (json.success && json.data && json.data.length > 0) {
             matchedCert = json.data[0];
           } else {
-            // Fallback search by party
             const allRes = await fetch(`/api/v1/analysis?partyId=${selectedPartyId}`);
             const allJson = await allRes.json();
             if (allJson.success && allJson.data) {
@@ -656,7 +640,7 @@ export default function InputOutputDetailsPage() {
             certsMap[certNo] = matchedCert;
             const cItems = matchedCert.items || matchedCert.certificateItems || [];
             if (cItems.length > 0) {
-              selectedMap[certNo] = cItems[0]; // Default select first item of each certificate
+              selectedMap[certNo] = cItems[0];
             }
           }
         }
@@ -721,7 +705,6 @@ export default function InputOutputDetailsPage() {
     return map;
   }, [partyReconciliations, filterPartyId, fromDate, toDate, statementsSearchQuery]);
 
-  // Paginated statements list
   const groupKeysArray = useMemo(() => Object.keys(groupedReconciliations), [groupedReconciliations]);
   const totalPages = Math.ceil(groupKeysArray.length / itemsPerPage);
   const paginatedGroupKeys = useMemo(() => {
@@ -741,7 +724,6 @@ export default function InputOutputDetailsPage() {
         }
       `}</style>
 
-      {/* Floating Toast Notification Container */}
       {toast && (
         <div className="fixed top-6 right-6 z-50 animate-bounce">
           <div className={`flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl border-2 text-white font-black text-xs sm:text-sm uppercase tracking-wider ${
@@ -758,7 +740,6 @@ export default function InputOutputDetailsPage() {
         </div>
       )}
 
-      {/* Top Banner Header */}
       <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl shadow-xl overflow-hidden">
         <div className="bg-gradient-to-r from-blue-700 via-blue-900 to-slate-950 p-5 sm:p-8 text-white flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 sm:gap-6">
           <div className="space-y-2">
@@ -782,7 +763,6 @@ export default function InputOutputDetailsPage() {
         </div>
       </div>
 
-      {/* Trader Selection Block */}
       <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-4">
         <div className="space-y-3 relative max-w-2xl" ref={partyDropdownRef}>
           <label className="block text-xs sm:text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
@@ -842,7 +822,6 @@ export default function InputOutputDetailsPage() {
       {selectedPartyId && (
         <div className="space-y-6 sm:space-y-8 max-w-full">
           
-          {/* --- 1. Import GD Box --- */}
           <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
               <h3 className="text-xl sm:text-2xl font-black text-slate-900 flex items-center gap-3">
@@ -967,7 +946,6 @@ export default function InputOutputDetailsPage() {
             </div>
           </div>
 
-          {/* --- 2. Export GD Box --- */}
           <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
               <h3 className="text-xl sm:text-2xl font-black text-slate-900 flex items-center gap-3">
@@ -1106,9 +1084,6 @@ export default function InputOutputDetailsPage() {
                                     onClick={() => {
                                       setEditingExportQtyItem(item);
                                       setTempExportQtyVal(qty.toString());
-                                      setIsUpdatedInModal(false);
-                                      setCalculatedBalancedQty(0);
-                                      setCalculatedBalancedVal(0);
                                     }}
                                     className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg border border-blue-300 transition cursor-pointer"
                                     title="Edit Quantity"
@@ -1136,7 +1111,6 @@ export default function InputOutputDetailsPage() {
           </div>
         </div>
 
-          {/* --- 3. Multi-Certificate Auto-Loaded Cards Box --- */}
           {selectedExportItem && (
             <div className="space-y-6 mt-6">
               <div className="bg-slate-900 text-white p-4 sm:p-5 rounded-2xl flex items-center justify-between shadow-lg">
@@ -1251,7 +1225,6 @@ export default function InputOutputDetailsPage() {
         </div>
       )}
 
-    {/* --- AUTOMATED CONSUMPTION & RECONCILIATION SUMMARY CARD --- */}
     {selectedExportItem && selectedImportItem && activeCertItem && (
       <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-2xl space-y-6 mt-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-200 pb-4 gap-4">
@@ -1324,7 +1297,6 @@ export default function InputOutputDetailsPage() {
       </div>
     )}
 
-    {/* --- RECONCILIATION STATEMENTS MATRIX TABLES WITH PARTY & DATE FILTERS & PAGINATION --- */}
     <div className="space-y-6 sm:space-y-10 mt-10">
       <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6">
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-slate-200 pb-5">
@@ -1358,7 +1330,6 @@ export default function InputOutputDetailsPage() {
           </div>
         </div>
 
-        {/* FILTER BAR */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end bg-slate-50 p-4 sm:p-6 rounded-2xl border-2 border-slate-200">
           <div className="space-y-1.5">
             <label className="block text-xs font-black text-slate-800 uppercase tracking-wider">Filter By Party</label>
@@ -1443,13 +1414,13 @@ export default function InputOutputDetailsPage() {
               const impQty = Number(rec.importQty || rec.importQtyKg || impQtyStr || 0);
 
               const recExportQty = Number(rec.exportQtyKg || rec.exportQty || 0);
-              const recTotalConsumedQty = Number(rec.consumptionIncWastage || rec.totalConsumedQty || (recExportQty * Number(rec.grossIocoConsumption || rec.netIocoConsumption || 0)) || 0);
                
-              let recWastageQty = Number(rec.actualWastageKg || rec.totalWastageQty || 0);
-              if (recWastageQty === 0 || recWastageQty < 1) {
-                const unitWast = Number(rec.wastageQty || rec.iocoWastageQty || 0);
-                recWastageQty = recExportQty * unitWast;
-              }
+              // Strict ratio calculation using net requirement + wastage per unit
+              const netReq = Number(rec.requirementQty || rec.netIocoConsumption || 0);
+              const wastUnit = Number(rec.wastageQty || rec.iocoWastageQty || 0);
+              
+              const recTotalConsumedQty = recExportQty * (netReq + wastUnit);
+              const recWastageQty = recExportQty * wastUnit;
 
               if (idx === 0) {
                 runningBalance = impQty - recTotalConsumedQty;
@@ -1467,6 +1438,10 @@ export default function InputOutputDetailsPage() {
             });
 
             const itemDesc = rows[0]?.importParticulars || rows[0]?.inputDescription || 'Standard Item';
+
+            // Absolute pure summation based strictly on displayed row values
+            const exactTotalConsumed = rows.reduce((sum, r) => sum + Number(r.resolvedTotalConsumed || 0), 0);
+            const exactTotalWastage = rows.reduce((sum, r) => sum + Number(r.resolvedWastageQty || 0), 0);
 
             return (
               <div key={groupKey} className="bg-white border-2 sm:border-4 border-slate-900 rounded-2xl p-4 sm:p-8 shadow-xl space-y-6">
@@ -1601,16 +1576,15 @@ export default function InputOutputDetailsPage() {
                         </tr>
                       ))}
 
-                      {/* TOTAL ROW FOR CONSUMPTION & WASTAGES */}
                       <tr className="bg-slate-900 font-black text-white border-t-4 border-slate-900">
                         <td colSpan={15} className="px-4 py-4 text-right uppercase tracking-wider text-white text-xs sm:text-sm">
                           TOTAL:
                         </td>
                         <td className="px-4 py-4 text-right font-mono text-cyan-400 text-xs sm:text-sm">
-                          {formatNumber(rows.reduce((sum, r) => sum + Number(r.resolvedTotalConsumed || 0), 4), 4)}
+                          {formatNumber(exactTotalConsumed, 4)}
                         </td>
                         <td className="px-4 py-4 text-right font-mono text-amber-400 text-xs sm:text-sm">
-                          {formatNumber(rows.reduce((sum, r) => sum + Number(r.resolvedWastageQty || 0), 4), 4)}
+                          {formatNumber(exactTotalWastage, 4)}
                         </td>
                         <td colSpan={2} className="px-4 py-4"></td>
                         <td className="px-4 py-4 text-center no-print"></td>
@@ -1622,7 +1596,6 @@ export default function InputOutputDetailsPage() {
             );
           })}
 
-          {/* PAGINATION CONTROLS BAR FOR STATEMENTS */}
           {totalPages > 1 && (
             <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border-2 border-slate-900 shadow-xl">
               <div className="flex items-center gap-2">
@@ -1705,11 +1678,10 @@ export default function InputOutputDetailsPage() {
       )}
     </div>
 
-    {/* QUICK EDIT MODAL FOR EXPORT GD ITEM QUANTITY, VALUE, & BALANCES (TWO-STEP: UPDATE -> SAVE) */}
     {editingExportQtyItem && (
       <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
         <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-          <h3 className="text-lg sm:text-xl font-black text-slate-900">Edit Export Quantity &amp; Balanced Values</h3>
+          <h3 className="text-lg sm:text-xl font-black text-slate-900">Edit Export Quantity &amp; Value</h3>
            
           <div className="space-y-4 text-xs sm:text-sm">
             <div>
@@ -1718,14 +1690,18 @@ export default function InputOutputDetailsPage() {
                 type="number" 
                 value={tempExportQtyVal} 
                 onChange={e => {
-                  setTempExportQtyVal(e.target.value);
-                  setIsUpdatedInModal(false);
+                  const val = e.target.value;
+                  setTempExportQtyVal(val);
+                  const manualQty = Number(val);
+                  const origQty = Number(editingExportQtyItem.qtyOfExports ?? editingExportQtyItem.quantity ?? 1);
+                  const origVal = Number(editingExportQtyItem.valueOfeExports ?? editingExportQtyItem.fobValueVal ?? 0);
+                  const calculatedVal = origQty > 0 ? (origVal / origQty) * manualQty : origVal;
+                  setCalculatedExportVal(calculatedVal);
                 }} 
                 className="w-full p-3.5 bg-slate-50 border-2 border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 font-mono font-bold text-base" 
               />
             </div>
 
-            {/* CALCULATED EXPORT VALUE DISPLAY */}
             <div className="bg-blue-50 p-4 rounded-2xl border-2 border-blue-300 space-y-1">
               <span className="text-[11px] font-black text-blue-800 uppercase tracking-wider block">Calculated Export Value</span>
               <span className="font-mono font-black text-blue-700 text-base block">
@@ -1737,25 +1713,6 @@ export default function InputOutputDetailsPage() {
                 )} Rs.
               </span>
             </div>
-
-            {/* BALANCED QUANTITY & BALANCED VALUE DISPLAY (Shown after clicking Update) */}
-            {isUpdatedInModal && (
-              <div className="grid grid-cols-2 gap-3 animate-fadeIn">
-                <div className="bg-emerald-50 p-3.5 rounded-2xl border-2 border-emerald-300 space-y-1">
-                  <span className="text-[10px] font-black text-emerald-800 uppercase tracking-wider block">Balanced Export Qty</span>
-                  <span className="font-mono font-black text-emerald-700 text-sm block">
-                    {formatNumber(calculatedBalancedQty, 4)} KG
-                  </span>
-                </div>
-
-                <div className="bg-slate-50 p-3.5 rounded-2xl border-2 border-slate-300 space-y-1">
-                  <span className="text-[10px] font-black text-slate-700 uppercase tracking-wider block">Balanced Export Value</span>
-                  <span className="font-mono font-black text-slate-900 text-sm block">
-                    {formatNumber(calculatedBalancedVal, 2)}
-                  </span>
-                </div>
-              </div>
-            )}
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
@@ -1767,29 +1724,18 @@ export default function InputOutputDetailsPage() {
               Cancel
             </button>
 
-            {!isUpdatedInModal ? (
-              <button 
-                type="button"
-                onClick={handleModalUpdateClick} 
-                className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow transition cursor-pointer"
-              >
-                Update
-              </button>
-            ) : (
-              <button 
-                type="button"
-                onClick={handleModalSaveClick} 
-                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow transition cursor-pointer"
-              >
-                Save
-              </button>
-            )}
+            <button 
+              type="button"
+              onClick={handleModalSaveClick} 
+              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow transition cursor-pointer"
+            >
+              Save
+            </button>
           </div>
         </div>
       </div>
     )}
 
-    {/* CUSTOM PROFESSIONAL CONFIRMATION / ALERT MODAL */}
     {confirmModal.isOpen && (
       <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
         <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-6 shadow-2xl">
@@ -1820,7 +1766,6 @@ export default function InputOutputDetailsPage() {
       </div>
     )}
 
-    {/* Footer */}
     <footer className="bg-gradient-to-r from-blue-700 via-blue-900 to-slate-950 text-blue-200 text-center py-4 sm:py-5 text-xs sm:text-sm font-bold border-t border-blue-900 w-full shadow-inner rounded-2xl mt-12">
       &copy; 2026 Customs Clearing ERP &bull; Powered by EFS Advanced Compliance Engine. All rights reserved.
     </footer>
