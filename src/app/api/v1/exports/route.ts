@@ -140,8 +140,12 @@ export async function POST(req: NextRequest) {
       const results = [];
 
       for (const [currentGdNum, gdItems] of Object.entries(groupedByGd)) {
-        let existingGd = await tx.exportGd.findUnique({
-          where: { exportGdNumber: currentGdNum },
+        // Updated to findFirst using both exportGdNumber and partyId
+        let existingGd = await tx.exportGd.findFirst({
+          where: { 
+            exportGdNumber: currentGdNum,
+            partyId: targetPartyId 
+          },
         });
 
         const formattedItemsData = gdItems.map((item: any, idx: number) => ({
