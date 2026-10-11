@@ -7,6 +7,7 @@ import { Upload, Plus, Trash2, Save, Loader2, FileSpreadsheet, Edit3, X, ShieldC
 export default function ExportGdForm() {
   const [activeTab, setActiveTab] = useState<'auto' | 'manual'>('auto');
   const [extractedPartyName, setExtractedPartyName] = useState('');
+  const [selectedPartyIdOverride, setSelectedPartyIdOverride] = useState(''); // 👈 Manual party override state
   const [parties, setParties] = useState<any[]>([]);
   const [items, setItems] = useState<any[]>([]);
   const [savedExports, setSavedExports] = useState<any[]>([]);
@@ -155,6 +156,17 @@ export default function ExportGdForm() {
         }
         detectedExporter = detectedExporter.replace(/^M\/S[:\s]*/i, '').trim();
         setExtractedPartyName(detectedExporter || 'SHIWANI TEXTILE');
+
+        // Automatically match and set override party ID if found in directory
+        const matched = parties.find(
+          p => p.companyName.toLowerCase().includes(detectedExporter.toLowerCase()) || 
+               detectedExporter.toLowerCase().includes(p.companyName.toLowerCase())
+        );
+        if (matched) {
+          setSelectedPartyIdOverride(matched.id);
+        } else if (parties.length > 0) {
+          setSelectedPartyIdOverride(parties[0].id);
+        }
 
         let headerRowIdx = -1;
         let certColIdx = -1;
@@ -323,21 +335,28 @@ export default function ExportGdForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!extractedPartyName || items.length === 0) {
+    if (items.length === 0) {
       showNotification('error', 'Please upload a valid Export Excel file first.');
       return;
     }
 
-    const matchedParty = parties.find(
-      p => p.companyName.toLowerCase().includes(extractedPartyName.toLowerCase()) || 
-           extractedPartyName.toLowerCase().includes(p.companyName.toLowerCase())
-    );
-    const partyId = matchedParty ? matchedParty.id : (parties.length > 0 ? parties[0].id : null);
+    // Use selected override party ID or fallback to matched party
+    let partyId = selectedPartyIdOverride;
+    if (!partyId && extractedPartyName) {
+      const matchedParty = parties.find(
+        p => p.companyName.toLowerCase().includes(extractedPartyName.toLowerCase()) || 
+             extractedPartyName.toLowerCase().includes(p.companyName.toLowerCase())
+      );
+      partyId = matchedParty ? matchedParty.id : (parties.length > 0 ? parties[0].id : null);
+    }
 
     if (!partyId) {
-      showNotification('error', 'Error: No matching Client Party found in directory. Please register this party first.');
+      showNotification('error', 'Error: No target Client Party selected. Please choose a party.');
       return;
     }
+
+    const selectedPartyObj = parties.find(p => p.id === partyId);
+    const finalPartyName = selectedPartyObj ? selectedPartyObj.companyName : extractedPartyName;
 
     const gdsMap: { [key: string]: any[] } = {};
     items.forEach(item => {
@@ -353,7 +372,7 @@ export default function ExportGdForm() {
         const payload = {
           gdNumber: gdNo,
           gdDate: gdItems[0]?.gdDate || new Date().toISOString(),
-          partyName: extractedPartyName,
+          partyName: finalPartyName,
           partyId: partyId,
           destinationCountry: 'China',
           portOfLoading: 'Port Qasim Karachi',
@@ -381,9 +400,10 @@ export default function ExportGdForm() {
         }
       }
 
-      showNotification('success', `All Export GDs extracted & saved successfully under ${extractedPartyName}!`);
+      showNotification('success', `All Export GDs extracted & saved successfully under ${finalPartyName}!`);
       setItems([]);
       setExtractedPartyName('');
+      setSelectedPartyIdOverride('');
       fetchData();
     } catch (err: any) {
       console.error('Submission error details:', err);
@@ -658,9 +678,27 @@ export default function ExportGdForm() {
             </div>
 
             {extractedPartyName && (
-              <div className="bg-blue-50 border border-blue-300 rounded-2xl p-4 sm:p-5 space-y-1.5 text-slate-800 shadow-sm text-sm sm:text-base">
-                <div><span className="font-black text-slate-900">Auto-Detected Exporter:</span> {extractedPartyName}</div>
+              <div className="bg-blue-50 border border-blue-300 rounded-2xl p-4 sm:p-5 space-y-3 text-slate-800 shadow-sm text-sm sm:text-base">
+                <div><span className="font-black text-slate-900">Auto-Detected Exporter from Excel:</span> {extractedPartyName}</div>
                 <div><span className="font-black text-slate-900">Total Export Items Extracted:</span> {items.length} rows</div>
+
+                {/* 👈 Manual Party Dropdown Override to prevent wrong party saving */}
+                <div className="space-y-1.5 pt-3 border-t border-blue-200">
+                  <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700">Confirm or Select Correct Target Party *</label>
+                  <select
+                    value={selectedPartyIdOverride}
+                    onChange={(e) => setSelectedPartyIdOverride(e.target.value)}
+                    required
+                    className="w-full p-3.5 bg-white border-2 border-blue-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-600 cursor-pointer shadow-sm"
+                  >
+                    <option value="">-- Choose Correct Party --</option>
+                    {parties.map(party => (
+                      <option key={party.id} value={party.id}>
+                        {party.companyName} ({party.ntn || 'N/A'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             )}
 
@@ -891,7 +929,6 @@ export default function ExportGdForm() {
         </div>
 
         <div className="bg-slate-50 border-2 border-slate-300 p-4 sm:p-5 rounded-2xl flex flex-wrap items-end gap-4 shadow-sm">
-          {/* Search GD Number Input Field */}
           <div className="flex-1 min-w-[220px] space-y-1.5">
             <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700">Search GD Number</label>
             <input
