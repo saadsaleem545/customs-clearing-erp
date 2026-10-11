@@ -7,7 +7,7 @@ import { Upload, Plus, Trash2, Save, Loader2, FileSpreadsheet, Edit3, X, ShieldC
 export default function ExportGdForm() {
   const [activeTab, setActiveTab] = useState<'auto' | 'manual'>('auto');
   const [extractedPartyName, setExtractedPartyName] = useState('');
-  const [selectedPartyIdOverride, setSelectedPartyIdOverride] = useState(''); // 👈 Manual party override state
+  const [selectedPartyIdOverride, setSelectedPartyIdOverride] = useState('');
   const [parties, setParties] = useState<any[]>([]);
   const [items, setItems] = useState<any[]>([]);
   const [savedExports, setSavedExports] = useState<any[]>([]);
@@ -16,11 +16,9 @@ export default function ExportGdForm() {
   const [message, setMessage] = useState('');
   const [historySearch, setHistorySearch] = useState('');
 
-  // Pagination States
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Professional Toast Notification State
   const [notification, setNotification] = useState<{
     show: boolean;
     type: 'success' | 'error';
@@ -34,7 +32,6 @@ export default function ExportGdForm() {
     }, 4000);
   };
 
-  // Custom Professional Confirmation Modal State
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -47,12 +44,10 @@ export default function ExportGdForm() {
     onConfirm: () => {},
   });
 
-  // Advanced Filter States for History Section
   const [filterPartyId, setFilterPartyId] = useState('');
   const [filterFromDate, setFilterFromDate] = useState('');
   const [filterToDate, setFilterToDate] = useState('');
 
-  // Manual Form States
   const [selectedManualPartyId, setSelectedManualPartyId] = useState('');
   const [manualGdNumber, setManualGdNumber] = useState('');
   const [manualGdDate, setManualGdDate] = useState('');
@@ -74,7 +69,7 @@ export default function ExportGdForm() {
     try {
       const d = new Date(dateVal);
       if (!isNaN(d.getTime())) {
-        return d.toLocaleDateString('en-GB'); // DD/MM/YYYY format
+        return d.toLocaleDateString('en-GB');
       }
       return String(dateVal);
     } catch {
@@ -136,13 +131,13 @@ export default function ExportGdForm() {
         const ws = workbook.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[];
 
-        let detectedExporter = 'SHIWANI TEXTILE';
-        for (let r = 0; r < Math.min(data.length, 10); r++) {
+        let detectedExporter = '';
+        for (let r = 0; r < Math.min(data.length, 5); r++) {
           const row = data[r];
           if (row) {
             for (let c = 0; c < row.length; c++) {
-              const cellVal = String(row[c] || '').trim();
-              if (cellVal.toUpperCase().includes('EXPORTER') || cellVal.toUpperCase().includes('PARTY') || cellVal.toUpperCase().includes('NAME')) {
+              const cellVal = String(row[c] || '').trim().toUpperCase();
+              if (cellVal.includes('NAME OF EXPORTER') || cellVal.includes('EXPORTER')) {
                 if (row[c + 1] && String(row[c + 1]).trim().length > 2) {
                   detectedExporter = String(row[c + 1]).trim();
                   break;
@@ -153,19 +148,27 @@ export default function ExportGdForm() {
               }
             }
           }
+          if (detectedExporter) break;
         }
+
+        if (!detectedExporter && data[0] && data[0][1]) {
+          detectedExporter = String(data[0][1]).trim();
+        }
+
         detectedExporter = detectedExporter.replace(/^M\/S[:\s]*/i, '').trim();
         setExtractedPartyName(detectedExporter || 'SHIWANI TEXTILE');
 
-        // Automatically match and set override party ID if found in directory
         const matched = parties.find(
-          p => p.companyName.toLowerCase().includes(detectedExporter.toLowerCase()) || 
+          p => p.companyName.toLowerCase() === detectedExporter.toLowerCase() ||
+               p.companyName.toLowerCase().includes(detectedExporter.toLowerCase()) || 
                detectedExporter.toLowerCase().includes(p.companyName.toLowerCase())
         );
+
         if (matched) {
           setSelectedPartyIdOverride(matched.id);
         } else if (parties.length > 0) {
-          setSelectedPartyIdOverride(parties[0].id);
+          const fuzzyMatch = parties.find(p => p.companyName.toLowerCase().substring(0, 5) === detectedExporter.toLowerCase().substring(0, 5));
+          setSelectedPartyIdOverride(fuzzyMatch ? fuzzyMatch.id : parties[0].id);
         }
 
         let headerRowIdx = -1;
@@ -340,7 +343,6 @@ export default function ExportGdForm() {
       return;
     }
 
-    // Use selected override party ID or fallback to matched party
     let partyId = selectedPartyIdOverride;
     if (!partyId && extractedPartyName) {
       const matchedParty = parties.find(
@@ -682,7 +684,6 @@ export default function ExportGdForm() {
                 <div><span className="font-black text-slate-900">Auto-Detected Exporter from Excel:</span> {extractedPartyName}</div>
                 <div><span className="font-black text-slate-900">Total Export Items Extracted:</span> {items.length} rows</div>
 
-                {/* 👈 Manual Party Dropdown Override to prevent wrong party saving */}
                 <div className="space-y-1.5 pt-3 border-t border-blue-200">
                   <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700">Confirm or Select Correct Target Party *</label>
                   <select

@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
         analysisCertificate: true,
       },
       orderBy: { createdAt: 'desc' },
-      take: 150,
+      // take: 150 limit removed so all records can grow dynamically
     });
 
     const formattedData = exportsList.map(formatExportRecord);
@@ -57,78 +57,18 @@ export async function POST(req: NextRequest) {
 
     let targetPartyId = partyId;
 
-    if (!targetPartyId && partyName) {
-      let party = await prisma.party.findFirst({
-        where: {
-          companyName: {
-            equals: partyName.trim(),
-            mode: 'insensitive',
-          },
-        },
-      });
-
-      if (!party) {
-        const randomCode = 'P-' + Math.floor(1000 + Math.random() * 9000);
-        party = await prisma.party.create({
-          data: {
-            partyCode: randomCode,
-            companyName: partyName.trim(),
-            ntn: 'EFS-' + Math.floor(1000 + Math.random() * 9000),
-            contactPerson: 'Auto Generated',
-            phone: 'N/A',
-            address: 'Auto-registered via System',
-          } as any,
-        });
-      }
-      targetPartyId = party.id;
-    }
-
-    if (!targetPartyId || !items || items.length === 0) {
+    if (!targetPartyId && !partyName) {
       return NextResponse.json(
         { success: false, error: 'Party and items are required.' },
         { status: 400 }
       );
     }
 
-    const incomingCertNo = items[0]?.analysisCertNo?.trim();
-
-    let analysisCert = null;
-    if (incomingCertNo) {
-      analysisCert = await prisma.analysisCertificate.findUnique({
-        where: { certificateNumber: incomingCertNo },
-      });
-
-      if (!analysisCert) {
-        analysisCert = await prisma.analysisCertificate.create({
-          data: {
-            certificateNumber: incomingCertNo,
-            partyId: targetPartyId,
-          } as any,
-        });
-      }
-    } else {
-      analysisCert = await prisma.analysisCertificate.findFirst({
-        where: { partyId: targetPartyId },
-        orderBy: { createdAt: 'desc' }
-      });
-
-      if (!analysisCert) {
-        analysisCert = await prisma.analysisCertificate.create({
-          data: {
-            certificateNumber: `CERT-${Math.floor(1000 + Math.random() * 9000)}`,
-            partyId: targetPartyId,
-          } as any,
-        });
-      }
-    }
-
-    const groupedByGd: { [key: string]: any[] } = {};
-    for (const item of items) {
-      const gdNum = item.gdNumber || gdNumber || 'GD-EXP-UNKNOWN';
-      if (!groupedByGd[gdNum]) {
-        groupedByGd[gdNum] = [];
-      }
-      groupedByGd[gdNum].push(item);
+    if (!items || items.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Export items are required.' },
+        { status: 400 }
+      );
     }
 
     let extractedDate = gdDate ? new Date(gdDate) : new Date();
@@ -136,11 +76,81 @@ export async function POST(req: NextRequest) {
       extractedDate = new Date();
     }
 
+    // Saari database operations transaction ke andar hain aur timeout 30 seconds set hai
     const createdRecords = await prisma.$transaction(async (tx) => {
+      // 1. Party resolution inside transaction
+      if (!targetPartyId && partyName) {
+        let party = await tx.party.findFirst({
+          where: {
+            companyName: {
+              equals: partyName.trim(),
+              mode: 'insensitive',
+            },
+          },
+        });
+
+        if (!party) {
+          const randomCode = 'P-' + Math.floor(1000 + Math.random() * 9000);
+          party = await tx.party.create({
+            data: {
+              partyCode: randomCode,
+              companyName: partyName.trim(),
+              ntn: 'EFS-' + Math.floor(1000 + Math.random() * 9000),
+              contactPerson: 'Auto Generated',
+              phone: 'N/A',
+              address: 'Auto-registered via System',
+            } as any,
+          });
+        }
+        targetPartyId = party.id;
+      }
+
+      // 2. Analysis Certificate resolution inside transaction
+      const incomingCertNo = items[0]?.analysisCertNo?.trim();
+      let analysisCert = null;
+
+      if (incomingCertNo) {
+        analysisCert = await tx.analysisCertificate.findUnique({
+          where: { certificateNumber: incomingCertNo },
+        });
+
+        if (!analysisCert) {
+          analysisCert = await tx.analysisCertificate.create({
+            data: {
+              certificateNumber: incomingCertNo,
+              partyId: targetPartyId,
+            } as any,
+          });
+        }
+      } else {
+        analysisCert = await tx.analysisCertificate.findFirst({
+          where: { partyId: targetPartyId },
+          orderBy: { createdAt: 'desc' }
+        });
+
+        if (!analysisCert) {
+          analysisCert = await tx.analysisCertificate.create({
+            data: {
+              certificateNumber: `CERT-${Math.floor(1000 + Math.random() * 9000)}`,
+              partyId: targetPartyId,
+            } as any,
+          });
+        }
+      }
+
+      // 3. Group items by GD Number
+      const groupedByGd: { [key: string]: any[] } = {};
+      for (const item of items) {
+        const gdNum = item.gdNumber || gdNumber || 'GD-EXP-UNKNOWN';
+        if (!groupedByGd[gdNum]) {
+          groupedByGd[gdNum] = [];
+        }
+        groupedByGd[gdNum].push(item);
+      }
+
       const results = [];
 
       for (const [currentGdNum, gdItems] of Object.entries(groupedByGd)) {
-        // Updated to findFirst using both exportGdNumber and partyId
         let existingGd = await tx.exportGd.findFirst({
           where: { 
             exportGdNumber: currentGdNum,
@@ -194,6 +204,9 @@ export async function POST(req: NextRequest) {
       }
 
       return results;
+    }, {
+      maxWait: 15000, // 15 seconds max wait time
+      timeout: 30000, // 30 seconds transaction timeout
     });
 
     const formattedResponseData = createdRecords.map(formatExportRecord);
