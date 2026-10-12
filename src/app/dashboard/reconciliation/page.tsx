@@ -88,12 +88,14 @@ export default function InputOutputDetailsPage() {
   const importItemVal = Number(selectedImportItem?.importValueVal ?? selectedImportItem?.assessableValue ?? selectedImportItem?.declaredValue ?? selectedImportItem?.value ?? 0);
   const importItemHsCode = selectedImportItem?.hsCode || selectedImportItem?.hs_code || 'N/A';
   const importItemDesc = selectedImportItem?.itemDescription || selectedImportItem?.particulars || selectedImportItem?.description || 'Import Material';
+  const importItemUom = selectedImportItem?.unit || selectedImportItem?.uom || 'KG';
   const currentGdNumber = selectedGdObject?.gdNumber || selectedGdObject?.importGdNumber || 'N/A';
 
   const exportQty = Number(selectedExportItem?.qtyOfExports || selectedExportItem?.quantity || 0);
   const exportVal = Number(selectedExportItem?.valueOfeExports || selectedExportItem?.fobValueVal || selectedExportItem?.fobValue || selectedExportItem?.value || 0);
   const exportGdNumber = selectedExportGdObject?.exportGdNumber || selectedExportGdObject?.gdNumber || selectedExportItem?.exportGdNo || 'N/A';
   const exportDesc = selectedExportItem?.exportParticulars || selectedExportItem?.itemDescription || selectedExportItem?.description || 'Export Item';
+  const exportItemUom = selectedExportItem?.unit || selectedExportItem?.uom || 'KG';
 
   const firstSelectedCertKey = Object.keys(selectedCertItemsMap)[0];
   const activeCertItem = firstSelectedCertKey ? selectedCertItemsMap[firstSelectedCertKey] : null;
@@ -188,6 +190,7 @@ export default function InputOutputDetailsPage() {
         closingBalance: displayBalancedQty,
         valueAddition: valueAdditionPct,
         analysisCertNo: currentCertNumber,
+        uom: exportItemUom,
       };
 
       const response = await fetch('/api/v1/reconciliations', {
@@ -456,7 +459,7 @@ export default function InputOutputDetailsPage() {
       "S. No.",
       "Import GD No.",
       "Input Description",
-      "Import Qty (kg)",
+      "Import Qty",
       "Import Value",
       "Input PCT",
       "Analysis Certificate No.",
@@ -466,11 +469,11 @@ export default function InputOutputDetailsPage() {
       "%age of Wastage",
       "Export GD No.",
       "Export Description",
-      "Export Qty (Kg)",
+      "Export Qty",
       "Export value (Rs.)",
       "Consumption including wastage",
-      "Wastages (kg)",
-      "Closing Balance (Kg)",
+      "Wastages",
+      "Closing Balance",
       "Value Addition"
     ];
     csvContent += headers.map(h => `"${h}"`).join(",") + "\n";
@@ -1058,6 +1061,7 @@ export default function InputOutputDetailsPage() {
                           const hsCode = item.exportHsCode || item.hsCode || 'N/A';
                           const certNo = item.analysisCertNo || 'N/A';
                           const qty = item.qtyOfExports ?? item.quantity ?? 0;
+                          const uom = item.unit || item.uom || 'KG';
                           const val = item.valueOfeExports ?? item.fobValueVal ?? 0;
                           const isItemSel = selectedExportItem?.id === item.id;
 
@@ -1092,7 +1096,7 @@ export default function InputOutputDetailsPage() {
                                   </button>
                                 </div>
                               </td>
-                              <td className="px-3 sm:px-5 py-3.5 font-mono font-black text-slate-700">KG</td>
+                              <td className="px-3 sm:px-5 py-3.5 font-mono font-black text-slate-700">{uom}</td>
                               <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(val, 2)}</td>
                             </tr>
                           );
@@ -1172,7 +1176,7 @@ export default function InputOutputDetailsPage() {
                                   <th className="px-3 sm:px-5 py-3.5 text-left">HS Code</th>
                                   <th className="px-3 sm:px-5 py-3.5 text-left">UOM</th>
                                   <th className="px-3 sm:px-5 py-3.5 text-right">Requirement (Net IOR)</th>
-                                  <th className="px-3 sm:px-5 py-3.5 text-right">Wastage (KG)</th>
+                                  <th className="px-3 sm:px-5 py-3.5 text-right">Wastage</th>
                                   <th className="px-3 sm:px-5 py-3.5 text-right">Input w/ Wastage</th>
                                   <th className="px-3 sm:px-5 py-3.5 text-right">Wastage %</th>
                                 </tr>
@@ -1259,7 +1263,7 @@ export default function InputOutputDetailsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           <div className="bg-slate-50 p-4 sm:p-6 rounded-2xl border-2 border-slate-300 hover:border-blue-500 transition space-y-2">
             <span className="text-xs sm:text-sm text-slate-700 uppercase tracking-wider block font-black">Export Quantity (GD)</span>
-            <span className="font-mono font-black text-slate-900 text-lg sm:text-xl block">{formatNumber(exportQty, 0)} KG</span>
+            <span className="font-mono font-black text-slate-900 text-lg sm:text-xl block">{formatNumber(exportQty, 0)} {exportItemUom}</span>
           </div>
 
           <div className="bg-slate-50 p-4 sm:p-6 rounded-2xl border-2 border-blue-300 hover:border-blue-600 transition space-y-2">
@@ -1269,7 +1273,7 @@ export default function InputOutputDetailsPage() {
 
           <div className="bg-blue-50 border-2 border-blue-500 ring-2 ring-blue-100 p-4 sm:p-6 rounded-2xl space-y-2">
             <span className="text-xs sm:text-sm text-blue-800 uppercase tracking-wider font-black block">Total Consumed Qty</span>
-            <span className="font-mono font-black text-blue-700 text-lg sm:text-xl block">{formatNumber(totalConsumedQty, 4)} KG</span>
+            <span className="font-mono font-black text-blue-700 text-lg sm:text-xl block">{formatNumber(totalConsumedQty, 4)} {importItemUom}</span>
           </div>
 
           <div className="bg-slate-50 p-4 sm:p-6 rounded-2xl border-2 border-slate-300 hover:border-blue-500 transition space-y-2">
@@ -1281,12 +1285,12 @@ export default function InputOutputDetailsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 max-w-5xl mx-auto pt-2">
           <div className="bg-slate-50 border-2 border-slate-300 hover:border-amber-500 transition p-4 sm:p-6 rounded-2xl space-y-2 text-center">
             <span className="text-xs sm:text-sm text-slate-700 uppercase tracking-wider block font-black">Total Wastage Qty</span>
-            <span className="font-mono font-black text-slate-900 text-lg sm:text-xl block">{formatNumber(totalWastageQty, 4)} KG</span>
+            <span className="font-mono font-black text-slate-900 text-lg sm:text-xl block">{formatNumber(totalWastageQty, 4)} {importItemUom}</span>
           </div>
 
           <div className="bg-slate-50 border-2 border-emerald-400 hover:border-emerald-600 transition p-4 sm:p-6 rounded-2xl space-y-2 text-center">
             <span className="text-xs sm:text-sm text-slate-700 uppercase tracking-wider block font-black">Balanced Quantity</span>
-            <span className="font-mono font-black text-emerald-700 text-lg sm:text-xl block">{formatNumber(displayBalancedQty, 4)} KG</span>
+            <span className="font-mono font-black text-emerald-700 text-lg sm:text-xl block">{formatNumber(displayBalancedQty, 4)} {importItemUom}</span>
           </div>
 
           <div className="bg-slate-50 border-2 border-slate-300 hover:border-blue-500 transition p-4 sm:p-6 rounded-2xl space-y-2 text-center">
@@ -1415,7 +1419,6 @@ export default function InputOutputDetailsPage() {
 
               const recExportQty = Number(rec.exportQtyKg || rec.exportQty || 0);
                
-              // Strict ratio calculation using net requirement + wastage per unit
               const netReq = Number(rec.requirementQty || rec.netIocoConsumption || 0);
               const wastUnit = Number(rec.wastageQty || rec.iocoWastageQty || 0);
               
@@ -1439,7 +1442,6 @@ export default function InputOutputDetailsPage() {
 
             const itemDesc = rows[0]?.importParticulars || rows[0]?.inputDescription || 'Standard Item';
 
-            // Absolute pure summation based strictly on displayed row values
             const exactTotalConsumed = rows.reduce((sum, r) => sum + Number(r.resolvedTotalConsumed || 0), 0);
             const exactTotalWastage = rows.reduce((sum, r) => sum + Number(r.resolvedWastageQty || 0), 0);
 
@@ -1508,7 +1510,7 @@ export default function InputOutputDetailsPage() {
                         <th className="px-3 py-3.5 text-center w-12">S. No.</th>
                         <th className="px-3 py-3.5">Import GD No.</th>
                         <th className="px-3 py-3.5">Input Description</th>
-                        <th className="px-3 py-3.5 text-right">Import Qty (kg)</th>
+                        <th className="px-3 py-3.5 text-right">Import Qty</th>
                         <th className="px-3 py-3.5 text-right">Import Value</th>
                         <th className="px-3 py-3.5">Input PCT</th>
                         <th className="px-3 py-3.5">Analysis Certificate No.</th>
@@ -1518,11 +1520,11 @@ export default function InputOutputDetailsPage() {
                         <th className="px-3 py-3.5 text-right">%age of Wastage</th>
                         <th className="px-3 py-3.5">Export GD No.</th>
                         <th className="px-3 py-3.5">Export Description</th>
-                        <th className="px-3 py-3.5 text-right">Export Qty (Kg)</th>
+                        <th className="px-3 py-3.5 text-right">Export Qty</th>
                         <th className="px-3 py-3.5 text-right">Export value (Rs.)</th>
                         <th className="px-3 py-3.5 text-right">Consumption including wastage</th>
-                        <th className="px-3 py-3.5 text-right">Wastages (kg)</th>
-                        <th className="px-3 py-3.5 text-right">Closing Balance (Kg)</th>
+                        <th className="px-3 py-3.5 text-right">Wastages</th>
+                        <th className="px-3 py-3.5 text-right">Closing Balance</th>
                         <th className="px-3 py-3.5 text-right">Value Addition</th>
                         <th className="px-3 py-3.5 text-center no-print">ACTIONS</th>
                       </tr>
@@ -1555,7 +1557,7 @@ export default function InputOutputDetailsPage() {
                           <td className="px-3 py-3.5 text-right font-mono font-black text-emerald-700">{formatNumber(rec.wastagePct || rec.wastagePercentage || 0, 2)}%</td>
                           <td className="px-3 py-3.5 font-mono font-black text-blue-700">{rec.exportGdNo || 'N/A'}</td>
                           <td className="px-3 py-3.5 font-black text-slate-900">{rec.exportDescription || 'Export Item'}</td>
-                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.resolvedExportQty, 0)}</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.resolvedExportQty, 0)} {rec.uom || ''}</td>
                           <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.exportValuePkr || 0, 2)}</td>
                           <td className="px-3 py-3.5 text-right font-mono font-black text-blue-700">{formatNumber(rec.resolvedTotalConsumed, 4)}</td>
                           <td className="px-3 py-3.5 text-right font-mono font-black text-slate-700">{formatNumber(rec.resolvedWastageQty, 4)}</td>
@@ -1685,7 +1687,7 @@ export default function InputOutputDetailsPage() {
            
           <div className="space-y-4 text-xs sm:text-sm">
             <div>
-              <label className="block text-slate-800 font-black uppercase tracking-wider mb-2">Quantity (KG)</label>
+              <label className="block text-slate-800 font-black uppercase tracking-wider mb-2">Quantity ({exportItemUom})</label>
               <input 
                 type="number" 
                 value={tempExportQtyVal} 
