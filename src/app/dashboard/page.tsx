@@ -19,7 +19,6 @@ import {
   LogOut,
   UserCheck,
   X,
-  Camera,
   KeyRound,
   User as UserIcon,
   Check,
@@ -42,17 +41,14 @@ export default function ExecutiveDashboardPage() {
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // User Profile State with localStorage persistence
-  const [userName, setUserName] = useState("Saad Saleem");
-  const [userRole, setUserRole] = useState("SUPER ADMIN");
-  const [profilePic, setProfilePic] = useState<string | null>(null);
+  // User Profile State with localStorage persistence (Initials only)
+  const [userName, setUserName] = useState("M Saleem");
+  const [userRole, setUserRole] = useState("ADMIN");
   
   // Load saved profile data from localStorage on initial mount
   useEffect(() => {
     const savedName = localStorage.getItem('erp_username');
-    const savedPic = localStorage.getItem('erp_profile_pic');
     if (savedName) setUserName(savedName);
-    if (savedPic) setProfilePic(savedPic);
   }, []);
   
   // Edit Profile Modal State
@@ -110,65 +106,17 @@ export default function ExecutiveDashboardPage() {
     fetchDashboardStats();
   }, []);
 
-  // Compressed Image Upload to prevent LocalStorage Quota Exceeded Error
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 200;
-          const MAX_HEIGHT = 200;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
-              width = MAX_WIDTH;
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
-              height = MAX_HEIGHT;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-          setProfilePic(dataUrl);
-          try {
-            localStorage.setItem('erp_profile_pic', dataUrl);
-          } catch (err) {
-            console.error('Storage quota exceeded', err);
-            alert('Image size is too large. Please select a smaller image.');
-          }
-        };
-        img.src = event.target?.result as string;
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     setProfileMessage({ type: '', text: '' });
 
     try {
-      // 1. Update Username if changed
       if (newUsername.trim()) {
         setUserName(newUsername);
         localStorage.setItem('erp_username', newUsername);
       }
 
-      // 2. Update Password via Database API Route
       if (newPassword) {
         if (newPassword.length < 3) {
           setIsSaving(false);
@@ -238,28 +186,24 @@ export default function ExecutiveDashboardPage() {
               <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${isRefreshing ? 'animate-spin' : ''}`} /> Sync Hub
             </button>
 
-            {/* Clickable User Profile Box inside Header */}
+            {/* Clickable User Profile Box with Clean Avatar Initials */}
             <div 
               onClick={() => {
                 setNewUsername(userName);
                 setIsEditProfileOpen(true);
               }}
-              className="px-4 py-2 bg-blue-950/70 hover:bg-blue-900/90 border border-blue-600/40 rounded-2xl flex items-center gap-4 shadow-inner cursor-pointer transition group"
+              className="bg-slate-900/90 hover:bg-slate-900 border border-slate-700/80 rounded-2xl py-2 px-3 flex items-center gap-4 shadow-xl cursor-pointer transition group"
               title="Click to Edit Profile"
             >
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-blue-700 text-white font-bold text-xs flex items-center justify-center ring-2 ring-blue-600 shrink-0 shadow overflow-hidden relative">
-                  {profilePic ? (
-                    <img src={profilePic} alt="Profile" className="w-full h-full object-cover object-center" />
-                  ) : (
-                    initials
-                  )}
+                <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-blue-400 shrink-0 shadow bg-blue-600 text-white font-black text-xs flex items-center justify-center">
+                  {initials}
                 </div>
                 <div className="text-left">
-                  <span className="font-black text-white group-hover:text-cyan-200 transition block text-xs tracking-tight flex items-center gap-1.5">
+                  <span className="font-bold text-white text-sm tracking-tight flex items-center gap-1.5">
                     {userName} <UserCheck className="w-3 h-3 text-cyan-400 opacity-0 group-hover:opacity-100 transition" />
                   </span>
-                  <span className="text-[10px] font-extrabold text-blue-300 font-mono tracking-wider">{userRole}</span>
+                  <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">{userRole}</span>
                 </div>
               </div>
 
@@ -269,7 +213,7 @@ export default function ExecutiveDashboardPage() {
                   await fetch('/api/v1/auth/logout', { method: 'POST' });
                   window.location.href = '/';
                 }}
-                className="p-2 rounded-xl bg-red-950/60 text-red-300 hover:bg-red-900 hover:text-white transition border border-red-800/50 cursor-pointer shrink-0 shadow"
+                className="p-2.5 rounded-xl bg-red-950/60 text-red-400 hover:bg-red-900 hover:text-white transition border border-red-800/40 cursor-pointer shrink-0 shadow-sm ml-2"
                 title="Secure Logout"
               >
                 <LogOut className="w-4 h-4" />
@@ -282,7 +226,7 @@ export default function ExecutiveDashboardPage() {
       {/* Main Container */}
       <main className="w-full px-6 lg:px-10 py-8 flex-grow space-y-8 max-w-[1600px] mx-auto">
         
-        {/* Command Banner - Clean Stacked Layout for Perfect Balance */}
+        {/* Command Banner */}
         <div className="bg-white border-2 border-slate-300 rounded-3xl p-6 sm:p-10 shadow-xl space-y-6 relative overflow-hidden">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="space-y-3">
@@ -313,7 +257,6 @@ export default function ExecutiveDashboardPage() {
             </div>
           </div>
 
-          {/* Bottom Action Buttons Row inside Banner with Generous Spacing */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-slate-200">
             <Link
               href="/dashboard/imports"
@@ -514,7 +457,7 @@ export default function ExecutiveDashboardPage() {
         &copy; 2026 Customs Clearing ERP &bull; Powered by EFS Advanced Compliance Engine. All rights reserved.
       </footer>
 
-      {/* Edit Profile Modal */}
+      {/* Edit Profile Modal (Avatar Upload Removed) */}
       {isEditProfileOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl space-y-6 relative animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
@@ -525,7 +468,7 @@ export default function ExecutiveDashboardPage() {
                 </div>
                 <div>
                   <h3 className="text-lg sm:text-xl font-black text-slate-900">Edit Administrator Profile</h3>
-                  <p className="text-xs text-slate-500 font-bold">Update profile picture, username &amp; security credentials</p>
+                  <p className="text-xs text-slate-500 font-bold">Update username &amp; security credentials</p>
                 </div>
               </div>
               <button
@@ -545,26 +488,6 @@ export default function ExecutiveDashboardPage() {
             )}
 
             <form onSubmit={handleUpdateProfile} className="space-y-5">
-              {/* Profile Picture Upload with Square/Cropped Preview Box */}
-              <div className="flex items-center gap-5">
-                <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-blue-700 to-indigo-600 text-white font-black text-2xl flex items-center justify-center ring-4 ring-slate-100 shadow-xl overflow-hidden relative group">
-                  {profilePic ? (
-                    <img src={profilePic} alt="Profile" className="w-full h-full object-cover object-center" />
-                  ) : (
-                    initials
-                  )}
-                  <label className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center text-white cursor-pointer text-[10px] font-bold">
-                    <Camera className="w-5 h-5 mb-0.5" /> Upload
-                    <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-                  </label>
-                </div>
-                <div className="space-y-1">
-                  <h4 className="text-sm font-black text-slate-900">Profile Picture</h4>
-                  <p className="text-xs text-slate-500 font-medium">Click on avatar to browse and upload a new photo. Auto-compressed &amp; permanently saved.</p>
-                </div>
-              </div>
-
-              {/* Username Input */}
               <div className="space-y-2">
                 <label className="text-xs font-black uppercase tracking-wider text-slate-700">Username / Full Name</label>
                 <div className="relative">
@@ -581,7 +504,6 @@ export default function ExecutiveDashboardPage() {
                 </div>
               </div>
 
-              {/* Change Password Section */}
               <div className="space-y-4 pt-2 border-t border-slate-200">
                 <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Change Password (Optional)</h4>
                 
@@ -602,7 +524,6 @@ export default function ExecutiveDashboardPage() {
                       type="button"
                       onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                       className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-700 transition cursor-pointer"
-                      title={showCurrentPassword ? 'Hide password' : 'Show password'}
                     >
                       {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -626,7 +547,6 @@ export default function ExecutiveDashboardPage() {
                       type="button"
                       onClick={() => setShowNewPassword(!showNewPassword)}
                       className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-700 transition cursor-pointer"
-                      title={showNewPassword ? 'Hide password' : 'Show password'}
                     >
                       {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -634,7 +554,6 @@ export default function ExecutiveDashboardPage() {
                 </div>
               </div>
 
-              {/* Modal Actions */}
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
                 <button
                   type="button"
