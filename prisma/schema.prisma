@@ -8,16 +8,16 @@ datasource db {
 }
 
 model User {
-  id               String       @id @default(uuid())
-  email            String       @unique
+  id               String            @id @default(uuid())
+  email            String            @unique
   name             String
   passwordHash     String
-  role             Role         @default(CLEARING_STAFF)
-  isActive         Boolean      @default(true)
+  role             Role              @default(CLEARING_STAFF)
+  isActive         Boolean           @default(true)
   resetToken       String?
   resetTokenExpiry DateTime?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
   auditLogs        AuditLog[]
   documents        Document[]
 
@@ -86,23 +86,23 @@ model HsCode {
 }
 
 model ImportGd {
-  id                   String        @id @default(uuid())
-  gdNumber             String        @unique
+  id                   String         @id @default(uuid())
+  gdNumber             String         @unique
   gdDate               DateTime
   partyId              String
   supplierName         String
   countryOfOrigin      String
   portOfDischarge      String
   blNumber             String?
-  totalAssessableValue Decimal       @db.Decimal(15, 2)
-  totalDutyTaxes       Decimal       @db.Decimal(15, 2)
+  totalAssessableValue Decimal        @db.Decimal(15, 2)
+  totalDutyTaxes       Decimal        @db.Decimal(15, 2)
   remarks              String?
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
   documents            Document[]
   exportGds            ExportGd[]
   items                ImportGdItem[]
-  party                Party         @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  party                Party          @relation(fields: [partyId], references: [id], onDelete: Cascade)
 
   @@index([gdNumber])
   @@index([partyId])
@@ -140,68 +140,70 @@ model ImportGdItem {
 
 model ExportGd {
   id                    String               @id @default(uuid())
-  exportGdNumber        String               // 👈 Removed global @unique
+  exportGdNumber        String
   date                  DateTime             @default(now())
   partyId               String
   importGdId            String?
   importGdNumber        String
-  analysisCertificateId String
+  analysisCertificateId String?              // 👈 Made optional at header level
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
   documents             Document[]
   items                 ExportGdItem[]
-  analysisCertificate   AnalysisCertificate  @relation(fields: [analysisCertificateId], references: [id], onDelete: Cascade)
+  analysisCertificate   AnalysisCertificate? @relation(fields: [analysisCertificateId], references: [id], onDelete: Cascade)
   importGd              ImportGd?            @relation(fields: [importGdId], references: [id])
   party                 Party                @relation(fields: [partyId], references: [id], onDelete: Cascade)
   reconciliations       ReconciliationItem[]
 
-  @@unique([exportGdNumber, partyId])       // 👈 Added composite unique constraint
+  @@unique([exportGdNumber, partyId])
   @@index([exportGdNumber])
   @@index([partyId])
   @@map("export_gds")
 }
 
 model ExportGdItem {
-  id                String   @id @default(uuid())
-  exportGdId        String
-  serialNo          Int      @default(1)
-  exportHsCode      String
-  exportParticulars String
-  qtyOfExports      Decimal  @db.Decimal(12, 4)
-  valueOfeExports   Decimal  @db.Decimal(12, 4)
-  unit              String   @default("KG")
-  importHsCode      String
-  inputValue        Decimal  @db.Decimal(12, 4)
-  wastageValue      Decimal  @db.Decimal(12, 4)
-  consumedQty       Decimal  @db.Decimal(12, 4)
-  wastageQty        Decimal  @db.Decimal(12, 4)
-  analysisCertNo    String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  exportGd          ExportGd @relation(fields: [exportGdId], references: [id], onDelete: Cascade)
+  id                    String               @id @default(uuid())
+  exportGdId            String
+  serialNo              Int                  @default(1)
+  exportHsCode          String
+  exportParticulars     String
+  qtyOfExports          Decimal              @db.Decimal(12, 4)
+  valueOfeExports       Decimal              @db.Decimal(12, 4)
+  unit                  String               @default("KG")
+  importHsCode          String
+  inputValue            Decimal              @db.Decimal(12, 4)
+  wastageValue          Decimal              @db.Decimal(12, 4)
+  consumedQty           Decimal              @db.Decimal(12, 4)
+  wastageQty            Decimal              @db.Decimal(12, 4)
+  analysisCertNo        String?
+  analysisCertificateId String?              // 👈 Added item-level certificate reference ID
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  exportGd              ExportGd             @relation(fields: [exportGdId], references: [id], onDelete: Cascade)
+  analysisCertificate   AnalysisCertificate? @relation(fields: [analysisCertificateId], references: [id], onDelete: SetNull) // 👈 Added relation
 
   @@map("export_gd_items")
 }
 
 model InputMaterial {
-  id                 String             @id @default(uuid())
+  id                 String               @id @default(uuid())
   partyId            String
   importGdItemId     String
   pctCode            String
   description        String
-  openingQty         Decimal            @default(0.000) @db.Decimal(12, 3)
-  importedQty        Decimal            @db.Decimal(12, 3)
-  consumedQty        Decimal            @default(0.000) @db.Decimal(12, 3)
-  wastageQty         Decimal            @default(0.000) @db.Decimal(12, 3)
-  closingQty         Decimal            @db.Decimal(12, 3)
-  unit               String             @default("Kg")
-  importValuePkr     Decimal            @db.Decimal(15, 2)
-  iocoRatio          Decimal            @db.Decimal(10, 6)
-  standardWastagePct Decimal            @db.Decimal(5, 2)
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  importGdItem       ImportGdItem       @relation(fields: [importGdItemId], references: [id], onDelete: Cascade)
-  party              Party              @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  openingQty         Decimal              @default(0.000) @db.Decimal(12, 3)
+  importedQty        Decimal              @db.Decimal(12, 3)
+  consumedQty        Decimal              @default(0.000) @db.Decimal(12, 3)
+  wastageQty         Decimal              @default(0.000) @db.Decimal(12, 3)
+  closingQty         Decimal              @db.Decimal(12, 3)
+  unit               String               @default("Kg")
+  importValuePkr     Decimal              @db.Decimal(15, 2)
+  iocoRatio          Decimal              @db.Decimal(10, 6)
+  standardWastagePct Decimal              @db.Decimal(5, 2)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  importGdItem       ImportGdItem         @relation(fields: [importGdItemId], references: [id], onDelete: Cascade)
+  party              Party                @relation(fields: [partyId], references: [id], onDelete: Cascade)
   reconciliations    ReconciliationItem[]
 
   @@index([partyId])
@@ -308,6 +310,7 @@ model AnalysisCertificate {
   items             AnalysisCertItem[]
   party             Party              @relation(fields: [partyId], references: [id], onDelete: Cascade)
   exportGds         ExportGd[]
+  exportGdItems     ExportGdItem[]     // 👈 Added reverse relation for item-level certificates
 
   @@map("analysis_certificates")
 }

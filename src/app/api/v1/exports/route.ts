@@ -16,7 +16,7 @@ const formatExportRecord = (rec: any) => ({
     quantity: Number(it.qtyOfExports || it.quantity || 0),
     uom: it.unit || it.uom || 'KG',
     fobValueVal: Number(it.valueOfeExports || it.fobValueVal || 0),
-    analysisCertNo: rec.analysisCertificate?.certificateNumber || it.analysisCertNo || '',
+    analysisCertNo: it.analysisCertNo || rec.analysisCertificate?.certificateNumber || '', // 👈 Item-level certificate takes priority
   }))
 });
 
@@ -37,7 +37,6 @@ export async function GET(req: NextRequest) {
         analysisCertificate: true,
       },
       orderBy: { createdAt: 'desc' },
-      // take: 150 limit removed so all records can grow dynamically
     });
 
     const formattedData = exportsList.map(formatExportRecord);
@@ -76,7 +75,6 @@ export async function POST(req: NextRequest) {
       extractedDate = new Date();
     }
 
-    // Saari database operations transaction ke andar hain aur timeout 30 seconds set hai
     const createdRecords = await prisma.$transaction(async (tx) => {
       // 1. Party resolution inside transaction
       if (!targetPartyId && partyName) {
@@ -105,7 +103,7 @@ export async function POST(req: NextRequest) {
         targetPartyId = party.id;
       }
 
-      // 2. Analysis Certificate resolution inside transaction
+      // 2. Fallback Analysis Certificate resolution for header
       const incomingCertNo = items[0]?.analysisCertNo?.trim();
       let analysisCert = null;
 
@@ -158,6 +156,7 @@ export async function POST(req: NextRequest) {
           },
         });
 
+        // Map items including their individual item-level analysisCertNo
         const formattedItemsData = gdItems.map((item: any, idx: number) => ({
           serialNo: idx + 1,
           exportHsCode: item.hsCode || item.exportHsCode || '',
@@ -170,6 +169,7 @@ export async function POST(req: NextRequest) {
           wastageValue: new Decimal(0),
           consumedQty: new Decimal(0),
           wastageQty: new Decimal(0),
+          analysisCertNo: item.analysisCertNo || '', // 👈 Saved individually per item row
         }));
 
         if (existingGd) {
@@ -205,8 +205,8 @@ export async function POST(req: NextRequest) {
 
       return results;
     }, {
-      maxWait: 15000, // 15 seconds max wait time
-      timeout: 30000, // 30 seconds transaction timeout
+      maxWait: 15000,
+      timeout: 30000,
     });
 
     const formattedResponseData = createdRecords.map(formatExportRecord);
