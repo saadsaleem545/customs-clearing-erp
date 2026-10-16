@@ -55,20 +55,25 @@ export async function POST(req: NextRequest) {
           partyId,
           items: {
             create: items.map((item: any, idx: number) => {
-              const reqQty = Number(item.requirementQty || 0);
-              const wastQty = Number(item.wastageQty || 0);
-              const inputWast = Number(item.inputWithWastage || (reqQty + wastQty));
-              const wastPct = Number(item.wastagePct || (inputWast > 0 ? (wastQty / inputWast) * 100 : 0));
+              // Exact string conversion taake user ki di hui saari decimal values preserve rahein
+              const reqQtyStr = String(item.requirementQty ?? '0');
+              const wastQtyStr = String(item.wastageQty ?? '0');
+              
+              const reqQtyNum = Number(reqQtyStr) || 0;
+              const wastQtyNum = Number(wastQtyStr) || 0;
+              
+              const inputWastNum = item.inputWithWastage !== undefined ? Number(item.inputWithWastage) : (reqQtyNum + wastQtyNum);
+              const wastPctNum = item.wastagePct !== undefined ? Number(item.wastagePct) : (inputWastNum > 0 ? (wastQtyNum / inputWastNum) * 100 : 0);
 
               return {
                 serialNo: idx + 1,
                 hsCode: item.hsCode,
                 itemDescription: item.itemDescription,
                 uom: item.uom || 'KG',
-                requirementQty: new Decimal(reqQty),
-                wastageQty: new Decimal(wastQty),
-                inputWithWastage: new Decimal(inputWast),
-                wastagePct: new Decimal(wastPct),
+                requirementQty: new Decimal(reqQtyStr),
+                wastageQty: new Decimal(wastQtyStr),
+                inputWithWastage: new Decimal(inputWastNum.toString()),
+                wastagePct: new Decimal(wastPctNum.toString()),
               };
             }),
           },
@@ -94,12 +99,12 @@ export async function PUT(req: NextRequest) {
     }
 
     const updatedCert = await prisma.$transaction(async (tx) => {
-      // 1. Delete old items using the correct schema model name 'analysisCertItem'
+      // 1. Delete old items
       await tx.analysisCertItem.deleteMany({
         where: { analysisCertificateId: id },
       });
 
-      // 2. Update certificate details and create new items matrix
+      // 2. Update certificate details and create new items matrix with full decimal precision
       return await tx.analysisCertificate.update({
         where: { id },
         data: {
@@ -107,20 +112,25 @@ export async function PUT(req: NextRequest) {
           partyId,
           items: {
             create: items.map((item: any, idx: number) => {
-              const reqQty = Number(item.requirementQty || 0);
-              const wastQty = Number(item.wastageQty || 0);
-              const inputWast = Number(item.inputWithWastage || (reqQty + wastQty));
-              const wastPct = Number(item.wastagePct || (inputWast > 0 ? (wastQty / inputWast) * 100 : 0));
+              // Exact string conversion taake decimals truncate na hon
+              const reqQtyStr = String(item.requirementQty ?? '0');
+              const wastQtyStr = String(item.wastageQty ?? '0');
+              
+              const reqQtyNum = Number(reqQtyStr) || 0;
+              const wastQtyNum = Number(wastQtyStr) || 0;
+              
+              const inputWastNum = item.inputWithWastage !== undefined ? Number(item.inputWithWastage) : (reqQtyNum + wastQtyNum);
+              const wastPctNum = item.wastagePct !== undefined ? Number(item.wastagePct) : (inputWastNum > 0 ? (wastQtyNum / inputWastNum) * 100 : 0);
 
               return {
                 serialNo: idx + 1,
                 hsCode: item.hsCode,
                 itemDescription: item.itemDescription,
                 uom: item.uom || 'KG',
-                requirementQty: new Decimal(reqQty),
-                wastageQty: new Decimal(wastQty),
-                inputWithWastage: new Decimal(inputWast),
-                wastagePct: new Decimal(wastPct),
+                requirementQty: new Decimal(reqQtyStr),
+                wastageQty: new Decimal(wastQtyStr),
+                inputWithWastage: new Decimal(inputWastNum.toString()),
+                wastagePct: new Decimal(wastPctNum.toString()),
               };
             }),
           },

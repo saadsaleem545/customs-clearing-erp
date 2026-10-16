@@ -8,16 +8,16 @@ datasource db {
 }
 
 model User {
-  id               String            @id @default(uuid())
-  email            String            @unique
+  id               String           @id @default(uuid())
+  email            String           @unique
   name             String
   passwordHash     String
-  role             Role              @default(CLEARING_STAFF)
-  isActive         Boolean           @default(true)
+  role             Role             @default(CLEARING_STAFF)
+  isActive         Boolean          @default(true)
   resetToken       String?
   resetTokenExpiry DateTime?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
   auditLogs        AuditLog[]
   documents        Document[]
 
@@ -116,7 +116,7 @@ model ImportGdItem {
   itemDescription String
   hsCode          String
   inputPct        String
-  quantity        Decimal         @db.Decimal(12, 3)
+  quantity        Decimal         @db.Decimal(15, 6)
   unit            String          @default("Kg")
   importValueVal  Decimal         @db.Decimal(15, 2)
   unitPrice       Decimal?        @db.Decimal(15, 2)
@@ -145,7 +145,7 @@ model ExportGd {
   partyId               String
   importGdId            String?
   importGdNumber        String
-  analysisCertificateId String?              // 👈 Made optional at header level
+  analysisCertificateId String?              
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
   documents             Document[]
@@ -167,20 +167,20 @@ model ExportGdItem {
   serialNo              Int                  @default(1)
   exportHsCode          String
   exportParticulars     String
-  qtyOfExports          Decimal              @db.Decimal(12, 4)
-  valueOfeExports       Decimal              @db.Decimal(12, 4)
+  qtyOfExports          Decimal              @db.Decimal(15, 6)
+  valueOfeExports       Decimal              @db.Decimal(15, 6)
   unit                  String               @default("KG")
   importHsCode          String
-  inputValue            Decimal              @db.Decimal(12, 4)
-  wastageValue          Decimal              @db.Decimal(12, 4)
-  consumedQty           Decimal              @db.Decimal(12, 4)
-  wastageQty            Decimal              @db.Decimal(12, 4)
+  inputValue            Decimal              @db.Decimal(15, 6)
+  wastageValue          Decimal              @db.Decimal(15, 6)
+  consumedQty           Decimal              @db.Decimal(15, 6)
+  wastageQty            Decimal              @db.Decimal(15, 6)
   analysisCertNo        String?
-  analysisCertificateId String?              // 👈 Added item-level certificate reference ID
+  analysisCertificateId String?              
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
   exportGd              ExportGd             @relation(fields: [exportGdId], references: [id], onDelete: Cascade)
-  analysisCertificate   AnalysisCertificate? @relation(fields: [analysisCertificateId], references: [id], onDelete: SetNull) // 👈 Added relation
+  analysisCertificate   AnalysisCertificate? @relation(fields: [analysisCertificateId], references: [id], onDelete: SetNull) 
 
   @@map("export_gd_items")
 }
@@ -191,11 +191,11 @@ model InputMaterial {
   importGdItemId     String
   pctCode            String
   description        String
-  openingQty         Decimal              @default(0.000) @db.Decimal(12, 3)
-  importedQty        Decimal              @db.Decimal(12, 3)
-  consumedQty        Decimal              @default(0.000) @db.Decimal(12, 3)
-  wastageQty         Decimal              @default(0.000) @db.Decimal(12, 3)
-  closingQty         Decimal              @db.Decimal(12, 3)
+  openingQty         Decimal              @default(0.000000) @db.Decimal(15, 6)
+  importedQty        Decimal              @default(0.000000) @db.Decimal(15, 6)
+  consumedQty        Decimal              @default(0.000000) @db.Decimal(15, 6)
+  wastageQty         Decimal              @default(0.000000) @db.Decimal(15, 6)
+  closingQty         Decimal              @default(0.000000) @db.Decimal(15, 6)
   unit               String               @default("Kg")
   importValuePkr     Decimal              @db.Decimal(15, 2)
   iocoRatio          Decimal              @db.Decimal(10, 6)
@@ -219,10 +219,10 @@ model Reconciliation {
   periodStart      DateTime
   periodEnd        DateTime
   status           ReconciliationStatus @default(PENDING)
-  totalImportQty   Decimal              @db.Decimal(12, 3)
-  totalExportQty   Decimal              @db.Decimal(12, 3)
-  totalWastageQty  Decimal              @db.Decimal(12, 3)
-  totalClosingQty  Decimal              @db.Decimal(12, 3)
+  totalImportQty   Decimal              @db.Decimal(15, 6)
+  totalExportQty   Decimal              @db.Decimal(15, 6)
+  totalWastageQty  Decimal              @db.Decimal(15, 6)
+  totalClosingQty  Decimal              @db.Decimal(15, 6)
   overallStatus    String
   notes            String?
   createdAt        DateTime             @default(now())
@@ -241,24 +241,24 @@ model ReconciliationItem {
   exportGdId            String?
   importGdNo            String
   inputDescription      String
-  importQtyKg           Decimal              @db.Decimal(12, 3)
+  importQtyKg           Decimal              @db.Decimal(15, 6)
   importValuePkr        Decimal              @db.Decimal(15, 2)
   inputPct              String
   analysisCertNo        String?
-  netIocoConsumption    Decimal              @db.Decimal(12, 4)
-  iocoWastageQty        Decimal              @db.Decimal(12, 4)
-  grossIocoConsumption  Decimal              @db.Decimal(12, 4)
+  netIocoConsumption    Decimal              @db.Decimal(15, 6)
+  iocoWastageQty        Decimal              @db.Decimal(15, 6)
+  grossIocoConsumption  Decimal              @db.Decimal(15, 6)
   wastagePercentage     Decimal              @db.Decimal(5, 2)
   exportGdNo            String?
   exportDescription     String?
-  exportQtyKg           Decimal              @default(0.000) @db.Decimal(12, 4)
+  exportQtyKg           Decimal              @default(0.000000) @db.Decimal(15, 6)
   exportValuePkr        Decimal              @default(0.00) @db.Decimal(15, 2)
-  consumptionIncWastage Decimal              @default(0.000) @db.Decimal(12, 4)
-  actualWastageKg       Decimal              @default(0.000) @db.Decimal(12, 4)
-  closingBalanceKg      Decimal              @default(0.000) @db.Decimal(12, 4)
+  consumptionIncWastage Decimal              @default(0.000000) @db.Decimal(15, 6)
+  actualWastageKg       Decimal              @default(0.000000) @db.Decimal(15, 6)
+  closingBalanceKg      Decimal              @default(0.000000) @db.Decimal(15, 6)
   valueAddition         Decimal              @default(0.00) @db.Decimal(10, 2)
-  unitClaim             Decimal?             @db.Decimal(12, 4)
-  calculatedDifference  Decimal?             @db.Decimal(12, 4)
+  unitClaim             Decimal?             @db.Decimal(15, 6)
+  calculatedDifference  Decimal?             @db.Decimal(15, 6)
   itemStatus            ReconciliationStatus @default(PENDING)
   exportGd              ExportGd?            @relation(fields: [exportGdId], references: [id])
   inputMaterial         InputMaterial        @relation(fields: [inputMaterialId], references: [id], onDelete: Cascade)
@@ -310,7 +310,7 @@ model AnalysisCertificate {
   items             AnalysisCertItem[]
   party             Party              @relation(fields: [partyId], references: [id], onDelete: Cascade)
   exportGds         ExportGd[]
-  exportGdItems     ExportGdItem[]     // 👈 Added reverse relation for item-level certificates
+  exportGdItems     ExportGdItem[]     
 
   @@map("analysis_certificates")
 }
@@ -322,9 +322,9 @@ model AnalysisCertItem {
   hsCode                String
   itemDescription       String
   uom                   String              @default("KG")
-  requirementQty        Decimal             @db.Decimal(12, 4)
-  wastageQty            Decimal             @db.Decimal(12, 4)
-  inputWithWastage      Decimal             @db.Decimal(12, 4)
+  requirementQty        Decimal             @db.Decimal(15, 6)
+  wastageQty            Decimal             @db.Decimal(15, 6)
+  inputWithWastage      Decimal             @db.Decimal(15, 6)
   wastagePct            Decimal             @db.Decimal(8, 4)
   analysisCertificate   AnalysisCertificate @relation(fields: [analysisCertificateId], references: [id], onDelete: Cascade)
 

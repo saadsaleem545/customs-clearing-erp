@@ -11,10 +11,10 @@ interface CertItem {
   hsCode: string;
   itemDescription: string;
   uom: string;
-  requirementQty: number;
-  wastageQty: number;
-  inputWithWastage: number;
-  wastagePct: number;
+  requirementQty: any;
+  wastageQty: any;
+  inputWithWastage: any;
+  wastagePct: any;
 }
 
 export default function AnalysisCertificatePage() {
@@ -144,10 +144,13 @@ export default function AnalysisCertificatePage() {
             const hsCode = String(row[0] || '').trim();
             const desc = String(row[1] || '').trim();
             const uom = String(row[2] || 'KG').trim();
-            const reqQty = row[3] !== undefined && row[3] !== '' ? Number(row[3]) : 0;
-            const wastQty = row[4] !== undefined && row[4] !== '' ? Number(row[4]) : 0;
-            const inputWast = reqQty + wastQty;
-            const wastPct = inputWast > 0 ? (wastQty / inputWast) * 100 : 0;
+            const reqQty = row[3] !== undefined && row[3] !== '' ? String(row[3]) : '0';
+            const wastQty = row[4] !== undefined && row[4] !== '' ? String(row[4]) : '0';
+            
+            const reqNum = parseFloat(reqQty) || 0;
+            const wastNum = parseFloat(wastQty) || 0;
+            const inputWast = reqNum + wastNum;
+            const wastPct = inputWast > 0 ? (wastNum / inputWast) * 100 : 0;
 
             if (hsCode && desc) {
               extractedItems.push({
@@ -157,8 +160,8 @@ export default function AnalysisCertificatePage() {
                 uom,
                 requirementQty: reqQty,
                 wastageQty: wastQty,
-                inputWithWastage: inputWast,
-                wastagePct: wastPct,
+                inputWithWastage: inputWast.toString(),
+                wastagePct: wastPct.toString(),
               });
             }
           }
@@ -187,20 +190,20 @@ export default function AnalysisCertificatePage() {
       return;
     }
 
-    const reqQty = parseFloat(reqQtyInput) || 0;
-    const wastQty = parseFloat(wastQtyInput) || 0;
-    const inputWast = reqQty + wastQty;
-    const wastPct = inputWast > 0 ? (wastQty / inputWast) * 100 : 0;
+    const reqNum = parseFloat(reqQtyInput) || 0;
+    const wastNum = parseFloat(wastQtyInput) || 0;
+    const inputWast = reqNum + wastNum;
+    const wastPct = inputWast > 0 ? (wastNum / inputWast) * 100 : 0;
 
     const newItem: CertItem = {
       serialNo: parsedItems.length + 1,
       hsCode: hsCodeInput.trim(),
       itemDescription: descInput.trim(),
       uom: uomInput.trim() || 'KG',
-      requirementQty: reqQty,
-      wastageQty: wastQty,
-      inputWithWastage: inputWast,
-      wastagePct: wastPct,
+      requirementQty: reqQtyInput,
+      wastageQty: wastQtyInput || '0',
+      inputWithWastage: inputWast.toString(),
+      wastagePct: wastPct.toString(),
     };
 
     setParsedItems(prev => [...prev, newItem]);
@@ -262,10 +265,10 @@ export default function AnalysisCertificatePage() {
         hsCode: it.hsCode,
         itemDescription: it.itemDescription,
         uom: it.uom,
-        requirementQty: Number(it.requirementQty),
-        wastageQty: Number(it.wastageQty),
-        inputWithWastage: Number(it.inputWithWastage),
-        wastagePct: Number(it.wastagePct),
+        requirementQty: String(it.requirementQty),
+        wastageQty: String(it.wastageQty),
+        inputWithWastage: String(it.inputWithWastage),
+        wastagePct: String(it.wastagePct),
       })),
     });
   };
@@ -294,7 +297,7 @@ export default function AnalysisCertificatePage() {
       if (result.success) {
         showNotification('success', 'Analysis Certificate updated successfully!');
         setEditModal({ isOpen: false, certId: '', certNumber: '', partyId: '', items: [] });
-        await fetchPartiesAndCerts(); // Ensure UI state is instantly refreshed with latest DB records
+        await fetchPartiesAndCerts();
       } else {
         showNotification('error', result.error || 'Failed to update certificate');
       }
@@ -686,9 +689,9 @@ export default function AnalysisCertificatePage() {
                             <td className="py-3 px-4 text-blue-700 font-black">{i.hsCode}</td>
                             <td className="py-3 px-4 font-black text-slate-900">{i.itemDescription}</td>
                             <td className="py-3 px-4 font-black">{i.uom}</td>
-                            <td className="py-3 px-4 text-right text-emerald-700 font-black">{Number(i.requirementQty)}</td>
-                            <td className="py-3 px-4 text-right font-black">{Number(i.wastageQty)}</td>
-                            <td className="py-3 px-4 text-right text-amber-700 font-black">{Number(i.inputWithWastage)}</td>
+                            <td className="py-3 px-4 text-right text-emerald-700 font-black">{i.requirementQty}</td>
+                            <td className="py-3 px-4 text-right font-black">{i.wastageQty}</td>
+                            <td className="py-3 px-4 text-right text-amber-700 font-black">{i.inputWithWastage}</td>
                             <td className="py-3 px-4 text-right font-black">{Number(i.wastagePct).toFixed(2)}%</td>
                           </tr>
                         ))}
@@ -838,49 +841,49 @@ export default function AnalysisCertificatePage() {
                         </td>
                         <td className="px-3 py-3 text-right">
                           <input
-                            type="number"
-                            step="any"
+                            type="text"
                             value={item.requirementQty}
                             onChange={(e) => {
-                              const reqVal = parseFloat(e.target.value) || 0;
+                              const valStr = e.target.value;
                               setEditModal(prev => {
                                 const newItems = [...prev.items];
-                                newItems[idx].requirementQty = reqVal;
-                                const wastKg = newItems[idx].wastageQty;
-                                const inputWast = reqVal + wastKg;
-                                newItems[idx].inputWithWastage = inputWast;
-                                newItems[idx].wastagePct = inputWast > 0 ? (wastKg / inputWast) * 100 : 0;
+                                newItems[idx].requirementQty = valStr;
+                                const reqNum = parseFloat(valStr) || 0;
+                                const wastNum = parseFloat(newItems[idx].wastageQty) || 0;
+                                const inputWast = reqNum + wastNum;
+                                newItems[idx].inputWithWastage = inputWast.toString();
+                                newItems[idx].wastagePct = inputWast > 0 ? ((wastNum / inputWast) * 100).toString() : '0';
                                 return { ...prev, items: newItems };
                               });
                             }}
-                            className="w-24 p-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-right font-mono"
+                            className="w-28 p-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-right font-mono"
                           />
                         </td>
                         <td className="px-3 py-3 text-right">
                           <input
-                            type="number"
-                            step="any"
+                            type="text"
                             value={item.wastageQty}
                             onChange={(e) => {
-                              const wastKg = parseFloat(e.target.value) || 0;
+                              const valStr = e.target.value;
                               setEditModal(prev => {
                                 const newItems = [...prev.items];
-                                newItems[idx].wastageQty = wastKg;
-                                const reqVal = newItems[idx].requirementQty;
-                                const inputWast = reqVal + wastKg;
-                                newItems[idx].inputWithWastage = inputWast;
-                                newItems[idx].wastagePct = inputWast > 0 ? (wastKg / inputWast) * 100 : 0;
+                                newItems[idx].wastageQty = valStr;
+                                const wastNum = parseFloat(valStr) || 0;
+                                const reqNum = parseFloat(newItems[idx].requirementQty) || 0;
+                                const inputWast = reqNum + wastNum;
+                                newItems[idx].inputWithWastage = inputWast.toString();
+                                newItems[idx].wastagePct = inputWast > 0 ? ((wastNum / inputWast) * 100).toString() : '0';
                                 return { ...prev, items: newItems };
                               });
                             }}
-                            className="w-24 p-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-right font-mono"
+                            className="w-28 p-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-right font-mono"
                           />
                         </td>
                         <td className="px-3 py-3 text-right font-black text-amber-700">
                           {item.inputWithWastage}
                         </td>
                         <td className="px-3 py-3 text-right font-black text-blue-700">
-                          {Number(item.wastagePct).toFixed(2)}%
+                          {Number(item.wastagePct || 0).toFixed(2)}%
                         </td>
                         <td className="px-3 py-3 text-center">
                           <button
