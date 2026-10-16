@@ -105,7 +105,7 @@ export async function PUT(req: NextRequest) {
       });
 
       // 2. Update certificate details and create new items matrix with full decimal precision
-      return await tx.analysisCertificate.update({
+      const cert = await tx.analysisCertificate.update({
         where: { id },
         data: {
           certificateNumber: certificateNumber.trim(),
@@ -137,6 +137,30 @@ export async function PUT(req: NextRequest) {
         },
         include: { items: true, party: true },
       });
+
+      // 3. Automatic Synchronization for Saved Reconciliations
+      for (const newItem of cert.items) {
+        await tx.reconciliationItem.updateMany({
+          where: {
+            OR: [
+              { analysisCertNo: cert.certificateNumber },
+              { analysisCertNo: certificateNumber.trim() }
+            ],
+            inputDescription: {
+              contains: newItem.itemDescription,
+              mode: 'insensitive',
+            },
+          },
+          data: {
+            netIocoConsumption: newItem.requirementQty,
+            iocoWastageQty: newItem.wastageQty,
+            grossIocoConsumption: newItem.inputWithWastage,
+            wastagePercentage: newItem.wastagePct,
+          },
+        });
+      }
+
+      return cert;
     });
 
     return NextResponse.json({ success: true, data: updatedCert });
