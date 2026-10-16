@@ -294,7 +294,7 @@ export default function AnalysisCertificatePage() {
       if (result.success) {
         showNotification('success', 'Analysis Certificate updated successfully!');
         setEditModal({ isOpen: false, certId: '', certNumber: '', partyId: '', items: [] });
-        fetchPartiesAndCerts();
+        await fetchPartiesAndCerts(); // Ensure UI state is instantly refreshed with latest DB records
       } else {
         showNotification('error', result.error || 'Failed to update certificate');
       }
@@ -743,7 +743,6 @@ export default function AnalysisCertificatePage() {
         </div>
       </div>
 
-      {/* EDIT MODAL WITH FORMULAS */}
       {editModal.isOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4 animate-fadeIn">
           <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-3xl max-w-6xl w-full p-4 sm:p-8 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto text-slate-900">
@@ -837,7 +836,6 @@ export default function AnalysisCertificatePage() {
                             className="w-16 p-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-center"
                           />
                         </td>
-                        {/* REQUIREMENT INPUT WITH FORMULA TRIGGER */}
                         <td className="px-3 py-3 text-right">
                           <input
                             type="number"
@@ -849,16 +847,15 @@ export default function AnalysisCertificatePage() {
                                 const newItems = [...prev.items];
                                 newItems[idx].requirementQty = reqVal;
                                 const wastKg = newItems[idx].wastageQty;
-                                const inputWast = reqVal + wastKg; // Formula 1
+                                const inputWast = reqVal + wastKg;
                                 newItems[idx].inputWithWastage = inputWast;
-                                newItems[idx].wastagePct = inputWast > 0 ? (wastKg / inputWast) * 100 : 0; // Formula 2
+                                newItems[idx].wastagePct = inputWast > 0 ? (wastKg / inputWast) * 100 : 0;
                                 return { ...prev, items: newItems };
                               });
                             }}
                             className="w-24 p-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-right font-mono"
                           />
                         </td>
-                        {/* WASTAGE KG INPUT WITH FORMULA TRIGGER */}
                         <td className="px-3 py-3 text-right">
                           <input
                             type="number"
@@ -870,20 +867,18 @@ export default function AnalysisCertificatePage() {
                                 const newItems = [...prev.items];
                                 newItems[idx].wastageQty = wastKg;
                                 const reqVal = newItems[idx].requirementQty;
-                                const inputWast = reqVal + wastKg; // Formula 1
+                                const inputWast = reqVal + wastKg;
                                 newItems[idx].inputWithWastage = inputWast;
-                                newItems[idx].wastagePct = inputWast > 0 ? (wastKg / inputWast) * 100 : 0; // Formula 2
+                                newItems[idx].wastagePct = inputWast > 0 ? (wastKg / inputWast) * 100 : 0;
                                 return { ...prev, items: newItems };
                               });
                             }}
                             className="w-24 p-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-right font-mono"
                           />
                         </td>
-                        {/* INPUT W/ WASTAGE (Auto calculated display) */}
                         <td className="px-3 py-3 text-right font-black text-amber-700">
                           {item.inputWithWastage}
                         </td>
-                        {/* WASTAGE % (Auto calculated display) */}
                         <td className="px-3 py-3 text-right font-black text-blue-700">
                           {Number(item.wastagePct).toFixed(2)}%
                         </td>
