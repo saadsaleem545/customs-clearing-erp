@@ -38,14 +38,13 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    // Flatten items and explicitly inject partyId so frontend filters match correctly
     const allItems: any[] = [];
     reconciliations.forEach(recon => {
       if (recon.items && recon.items.length > 0) {
         recon.items.forEach(item => {
           allItems.push({
             ...item,
-            partyId: recon.partyId, // <--- Crucial fix: Attached partyId to each flattened item row
+            partyId: recon.partyId,
             reconciliationNo: recon.reconciliationNo,
             statementDate: recon.statementDate,
           });
@@ -54,6 +53,79 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json({ success: true, data: allItems });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+// PUT /api/v1/reconciliations - Auto-Sync & Refresh Saved Reconciliations for a Party
+export async function PUT(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { partyId } = body;
+
+    if (!partyId) {
+      return NextResponse.json({ success: false, error: 'Party ID is required for syncing' }, { status: 400 });
+    }
+
+    const reconHeaders = await prisma.reconciliation.findMany({
+      where: { partyId },
+      include: { items: { include: { inputMaterial: true, exportGd: { include: { items: true } } } } },
+    });
+
+    if (!reconHeaders || reconHeaders.length === 0) {
+      return NextResponse.json({ success: true, message: 'No reconciliations found to sync' });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      for (const recon of reconHeaders) {
+        for (const item of recon.items) {
+          const inputMat = item.inputMaterial;
+          const exportGd = item.exportGd;
+
+          if (inputMat && exportGd && exportGd.items && exportGd.items.length > 0) {
+            const expItem: any = exportGd.items[0];
+            const expQty = new Decimal(item.exportQtyKg?.toString() || expItem.qtyOfExports?.toString() || '0');
+            const importQty = new Decimal(item.importQtyKg?.toString() || inputMat.importedQty?.toString() || '0');
+            const importVal = new Decimal(item.importValuePkr?.toString() || inputMat.importValuePkr?.toString() || '0');
+            
+            const netIoco = new Decimal(item.netIocoConsumption?.toString() || '0');
+            const iocoWastage = new Decimal(item.iocoWastageQty?.toString() || '0');
+            const grossConsumption = netIoco.plus(iocoWastage);
+
+            const totalConsumption = expQty.times(grossConsumption);
+            const totalWastage = iocoWastage.times(expQty);
+            const closingBalance = importQty.minus(totalConsumption);
+
+            const costPerKg = importQty.greaterThan(0) ? importVal.dividedBy(importQty) : new Decimal(0);
+            const consumedVal = totalConsumption.times(costPerKg);
+            const expVal = new Decimal(item.exportValuePkr?.toString() || expItem.valueOfeExports?.toString() || '0');
+
+            let valueAddition = new Decimal(0);
+            if (consumedVal.greaterThan(0) && expVal.greaterThan(0)) {
+              valueAddition = expVal.minus(consumedVal).dividedBy(consumedVal).times(100);
+            }
+
+            let itemStatus: any = 'RECONCILED';
+            if (closingBalance.lessThan(0)) itemStatus = 'EXCESS';
+            else if (closingBalance.greaterThan(0)) itemStatus = 'PARTIALLY_RECONCILED';
+
+            await tx.reconciliationItem.update({
+              where: { id: item.id },
+              data: {
+                consumptionIncWastage: totalConsumption,
+                actualWastageKg: totalWastage,
+                closingBalanceKg: closingBalance,
+                valueAddition: valueAddition,
+                itemStatus: itemStatus,
+              },
+            });
+          }
+        }
+      }
+    });
+
+    return NextResponse.json({ success: true, message: 'Reconciliations synced and updated successfully' });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
@@ -89,7 +161,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1. Fetch Input Material Ledger with intelligent fallback handling
     let inputMaterial = await prisma.inputMaterial.findUnique({
       where: { id: importMaterialId },
       include: {
@@ -139,7 +210,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2. Fetch Export GD Item Details if linked
     let exportGdNo = 'STOCK-IN-HAND';
     let exportDesc = 'Active Production Inventory';
     let actualExpVal = new Decimal(exportValuePkr || 0);
@@ -162,11 +232,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 3. Direct Certificate per-unit Values Mapping with Exact 4-Decimal Precision
     const importQty = new Decimal(payloadImportQty ?? inputMaterial.importedQty.toString());
     const importValuePkr = new Decimal(payloadImportValue ?? inputMaterial.importValuePkr.toString());
     
-    // Explicitly parse with Decimal to preserve exact decimals like 0.6375 and 0.2125
     const netIocoConsumption = requirementQty !== undefined ? new Decimal(requirementQty) : new Decimal(0);
     const totalWastageKg = wastageQty !== undefined ? new Decimal(wastageQty) : new Decimal(0);
     const consumptionIncWastagePerUnit = inputWithWastage !== undefined ? new Decimal(inputWithWastage) : netIocoConsumption.plus(totalWastageKg);
@@ -181,11 +249,7 @@ export async function POST(req: NextRequest) {
         : new Decimal(0);
 
     const closingBalanceKg = importQty.minus(totalConsumptionIncWastage);
-
-    const unitClaim = expQty.greaterThan(0) 
-      ? consumptionIncWastagePerUnit 
-      : new Decimal(0);
-
+    const unitClaim = expQty.greaterThan(0) ? consumptionIncWastagePerUnit : new Decimal(0);
     const costPerKgImport = importQty.greaterThan(0) ? importValuePkr.dividedBy(importQty) : new Decimal(0);
     const consumedImportValPkr = totalConsumptionIncWastage.times(costPerKgImport);
     
@@ -203,9 +267,7 @@ export async function POST(req: NextRequest) {
       itemStatus = 'PARTIALLY_RECONCILED';
     }
 
-    // 4. Update Database inside Transaction
     const result = await prisma.$transaction(async (tx) => {
-      // Ensure we find or create the reconciliation header strictly for THIS partyId
       let reconHeader = await tx.reconciliation.findFirst({
         where: { partyId },
         orderBy: { statementDate: 'desc' },
@@ -244,8 +306,8 @@ export async function POST(req: NextRequest) {
           importValuePkr: importValuePkr,
           inputPct: resolvedHsCode,
           analysisCertNo: analysisCertNo || 'N/A',
-          netIocoConsumption,       // Preserves exact Decimal(12, 4) value like 0.6375
-          iocoWastageQty: totalWastageKg, // Preserves exact Decimal(12, 4) value like 0.2125
+          netIocoConsumption,
+          iocoWastageQty: totalWastageKg,
           grossIocoConsumption: consumptionIncWastagePerUnit,
           wastagePercentage: wastagePct,
           exportGdNo,

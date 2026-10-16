@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { Decimal } from '@prisma/client/runtime/library';
 
-// GET /api/v1/analysis - Fetch Analysis Certificates (Fixed certificateNumber query handling)
+// GET /api/v1/analysis - Fetch Analysis Certificates
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -12,10 +12,7 @@ export async function GET(req: NextRequest) {
     const where: any = {};
     if (partyId) where.partyId = partyId;
     if (certNumber) {
-      where.certificateNumber = { 
-        equals: certNumber.trim(), 
-        mode: 'insensitive' 
-      };
+      where.certificateNumber = { equals: certNumber.trim(), mode: 'insensitive' };
     }
 
     const certificates = await prisma.analysisCertificate.findMany({
@@ -40,10 +37,7 @@ export async function POST(req: NextRequest) {
     const { certificateNumber, partyId, items } = body;
 
     if (!certificateNumber || !partyId || !items || items.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Certificate Number, Party, and Items matrix are required.' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: 'Certificate Number, Party, and Items are required.' }, { status: 400 });
     }
 
     const existing = await prisma.analysisCertificate.findUnique({
@@ -51,10 +45,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (existing) {
-      return NextResponse.json(
-        { success: false, error: `Analysis Certificate Number ${certificateNumber} already exists.` },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: `Analysis Certificate Number ${certificateNumber} already exists.` }, { status: 400 });
     }
 
     const newCert = await prisma.$transaction(async (tx) => {
@@ -67,7 +58,7 @@ export async function POST(req: NextRequest) {
               const reqQty = Number(item.requirementQty || 0);
               const wastQty = Number(item.wastageQty || 0);
               const inputWast = Number(item.inputWithWastage || (reqQty + wastQty));
-              const wastPct = Number(item.wastagePct || (reqQty > 0 ? (wastQty / reqQty) * 100 : 0));
+              const wastPct = Number(item.wastagePct || (inputWast > 0 ? (wastQty / inputWast) * 100 : 0));
 
               return {
                 serialNo: idx + 1,
@@ -92,7 +83,60 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// DELETE /api/v1/analysis?id=XYZ - Delete Analysis Certificate
+// PUT /api/v1/analysis - Update/Edit Analysis Certificate & Matrix items
+export async function PUT(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { id, certificateNumber, partyId, items } = body;
+
+    if (!id || !certificateNumber || !items || items.length === 0) {
+      return NextResponse.json({ success: false, error: 'Certificate ID, Number, and Items are required for update.' }, { status: 400 });
+    }
+
+    const updatedCert = await prisma.$transaction(async (tx) => {
+      // 1. Delete old items using the correct schema model name 'analysisCertItem'
+      await tx.analysisCertItem.deleteMany({
+        where: { analysisCertificateId: id },
+      });
+
+      // 2. Update certificate details and create new items matrix
+      return await tx.analysisCertificate.update({
+        where: { id },
+        data: {
+          certificateNumber: certificateNumber.trim(),
+          partyId,
+          items: {
+            create: items.map((item: any, idx: number) => {
+              const reqQty = Number(item.requirementQty || 0);
+              const wastQty = Number(item.wastageQty || 0);
+              const inputWast = Number(item.inputWithWastage || (reqQty + wastQty));
+              const wastPct = Number(item.wastagePct || (inputWast > 0 ? (wastQty / inputWast) * 100 : 0));
+
+              return {
+                serialNo: idx + 1,
+                hsCode: item.hsCode,
+                itemDescription: item.itemDescription,
+                uom: item.uom || 'KG',
+                requirementQty: new Decimal(reqQty),
+                wastageQty: new Decimal(wastQty),
+                inputWithWastage: new Decimal(inputWast),
+                wastagePct: new Decimal(wastPct),
+              };
+            }),
+          },
+        },
+        include: { items: true, party: true },
+      });
+    });
+
+    return NextResponse.json({ success: true, data: updatedCert });
+  } catch (error: any) {
+    console.error('PUT Analysis Error:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+// DELETE /api/v1/analysis - Delete Analysis Certificate
 export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);

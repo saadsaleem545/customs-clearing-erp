@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { FileSpreadsheet, CheckCircle2, Filter, Search, Trash2, Printer, Plus, ShieldCheck, ArrowLeft, ArrowRight, ArrowUpRight, AlertCircle, X } from 'lucide-react';
+import { FileSpreadsheet, CheckCircle2, Filter, Search, Trash2, Printer, Plus, ShieldCheck, ArrowLeft, ArrowRight, Edit3, AlertCircle, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import * as XLSX from 'xlsx';
 
 interface CertItem {
+  id?: string;
   serialNo: number;
   hsCode: string;
   itemDescription: string;
@@ -29,11 +30,17 @@ export default function AnalysisCertificatePage() {
   const [filterPartyId, setFilterPartyId] = useState('');
   const [searchCertNo, setSearchCertNo] = useState('');
 
-  // Pagination States
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5; // Har page par 5 certificates show honge (apni marzi se adjust kar sakte hain)
+  const itemsPerPage = 5;
 
-  // Professional Toast Notification State
+  const [editModal, setEditModal] = useState<{
+    isOpen: boolean;
+    certId: string;
+    certNumber: string;
+    partyId: string;
+    items: CertItem[];
+  }>({ isOpen: false, certId: '', certNumber: '', partyId: '', items: [] });
+
   const [notification, setNotification] = useState<{
     show: boolean;
     type: 'success' | 'error';
@@ -66,7 +73,6 @@ export default function AnalysisCertificatePage() {
   const [wastQtyInput, setWastQtyInput] = useState('');
 
   const [printingCertId, setPrintingCertId] = useState<string | null>(null);
-  const [selectedMobileCertItems, setSelectedMobileCertItems] = useState<{ items: any[]; certNumber: string; partyName?: string } | null>(null);
 
   useEffect(() => {
     fetchPartiesAndCerts();
@@ -98,14 +104,7 @@ export default function AnalysisCertificatePage() {
     try {
       const uploadFormData = new FormData();
       uploadFormData.append('file', file);
-      const uploadRes = await fetch('/api/v1/upload', {
-        method: 'POST',
-        body: uploadFormData,
-      });
-      const uploadResult = await uploadRes.json();
-      if (uploadResult.success) {
-        console.log('Document successfully uploaded to AWS S3:', uploadResult.fileUrl);
-      }
+      await fetch('/api/v1/upload', { method: 'POST', body: uploadFormData });
     } catch (uploadErr) {
       console.error('S3 Upload background sync notice:', uploadErr);
     }
@@ -127,10 +126,8 @@ export default function AnalysisCertificatePage() {
           const row = data[i];
           for (let j = 0; j < row.length; j++) {
             const val = String(row[j] || '').trim();
-            if (val.toUpperCase().includes('KEXP') || val.toUpperCase().includes('KPQE') || val.includes('-')) {
-              if (val.length > 10 && !detectedCertNo) {
-                detectedCertNo = val;
-              }
+            if ((val.toUpperCase().includes('KEXP') || val.toUpperCase().includes('KPQE') || val.includes('-')) && val.length > 10 && !detectedCertNo) {
+              detectedCertNo = val;
             }
             if (val.toUpperCase() === 'HS CODE') {
               startIndex = i + 1;
@@ -142,13 +139,15 @@ export default function AnalysisCertificatePage() {
           let sNoCounter = parsedItems.length + 1;
           for (let i = startIndex; i < data.length; i++) {
             const row = data[i];
+            if (!row || row.length === 0) continue;
+
             const hsCode = String(row[0] || '').trim();
             const desc = String(row[1] || '').trim();
             const uom = String(row[2] || 'KG').trim();
-            const reqQty = parseFloat(row[3]) || 0;
-            const wastQty = parseFloat(row[4]) || 0;
-            const inputWast = parseFloat(row[5]) || (reqQty + wastQty);
-            const wastPct = parseFloat(row[6]) || (reqQty > 0 ? Number(((wastQty / reqQty) * 100).toFixed(4)) : 0);
+            const reqQty = row[3] !== undefined && row[3] !== '' ? Number(row[3]) : 0;
+            const wastQty = row[4] !== undefined && row[4] !== '' ? Number(row[4]) : 0;
+            const inputWast = reqQty + wastQty;
+            const wastPct = inputWast > 0 ? (wastQty / inputWast) * 100 : 0;
 
             if (hsCode && desc) {
               extractedItems.push({
@@ -169,9 +168,9 @@ export default function AnalysisCertificatePage() {
 
         if (extractedItems.length > 0) {
           setParsedItems(prev => [...prev, ...extractedItems]);
-          showNotification('success', `Successfully extracted ${extractedItems.length} items & saved file to AWS S3!`);
+          showNotification('success', `Successfully extracted ${extractedItems.length} items!`);
         } else {
-          showNotification('success', 'File saved to AWS S3 successfully, but please add items manually.');
+          showNotification('success', 'File saved successfully, please add items manually.');
         }
       } catch (err) {
         console.error(err);
@@ -191,7 +190,7 @@ export default function AnalysisCertificatePage() {
     const reqQty = parseFloat(reqQtyInput) || 0;
     const wastQty = parseFloat(wastQtyInput) || 0;
     const inputWast = reqQty + wastQty;
-    const wastPct = reqQty > 0 ? Number(((wastQty / reqQty) * 100).toFixed(4)) : 0;
+    const wastPct = inputWast > 0 ? (wastQty / inputWast) * 100 : 0;
 
     const newItem: CertItem = {
       serialNo: parsedItems.length + 1,
@@ -251,6 +250,62 @@ export default function AnalysisCertificatePage() {
     }
   };
 
+  const handleOpenEditModal = (cert: any) => {
+    setEditModal({
+      isOpen: true,
+      certId: cert.id,
+      certNumber: cert.certificateNumber,
+      partyId: cert.partyId,
+      items: cert.items.map((it: any) => ({
+        id: it.id,
+        serialNo: it.serialNo,
+        hsCode: it.hsCode,
+        itemDescription: it.itemDescription,
+        uom: it.uom,
+        requirementQty: Number(it.requirementQty),
+        wastageQty: Number(it.wastageQty),
+        inputWithWastage: Number(it.inputWithWastage),
+        wastagePct: Number(it.wastagePct),
+      })),
+    });
+  };
+
+  const handleUpdateCertificate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editModal.certNumber || editModal.items.length === 0) {
+      showNotification('error', 'Certificate number and items are required.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch('/api/v1/analysis', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editModal.certId,
+          certificateNumber: editModal.certNumber,
+          partyId: editModal.partyId,
+          items: editModal.items,
+        }),
+      });
+
+      const result = await res.json();
+      if (result.success) {
+        showNotification('success', 'Analysis Certificate updated successfully!');
+        setEditModal({ isOpen: false, certId: '', certNumber: '', partyId: '', items: [] });
+        fetchPartiesAndCerts();
+      } else {
+        showNotification('error', result.error || 'Failed to update certificate');
+      }
+    } catch (err) {
+      console.error(err);
+      showNotification('error', 'An error occurred while updating.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDeleteCertificate = (id: string, certNo: string) => {
     setConfirmModal({
       isOpen: true,
@@ -258,9 +313,7 @@ export default function AnalysisCertificatePage() {
       message: `Are you sure you want to delete Analysis Certificate: ${certNo}?`,
       onConfirm: async () => {
         try {
-          const res = await fetch(`/api/v1/analysis?id=${id}`, {
-            method: 'DELETE',
-          });
+          const res = await fetch(`/api/v1/analysis?id=${id}`, { method: 'DELETE' });
           const result = await res.json();
           if (result.success) {
             showNotification('success', 'Analysis Certificate deleted successfully.');
@@ -286,7 +339,6 @@ export default function AnalysisCertificatePage() {
     }, 100);
   };
 
-  // Pagination calculation for certificates list
   const totalPages = Math.ceil(certificates.length / itemsPerPage);
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -322,7 +374,6 @@ export default function AnalysisCertificatePage() {
         }
       `}</style>
 
-      {/* FLOATING TOAST NOTIFICATION */}
       {notification.show && (
         <div className="fixed top-6 right-6 z-50 animate-bounce">
           <div className={`flex items-center gap-3 px-5 py-4 rounded-2xl shadow-2xl border-2 text-white font-black text-xs sm:text-sm uppercase tracking-wider ${
@@ -361,7 +412,7 @@ export default function AnalysisCertificatePage() {
             </div>
             <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-tight">Analysis Certificate Manager</h1>
             <p className="text-sm sm:text-base text-blue-200 font-medium max-w-2xl">
-              Upload EFS Excel document to AWS S3 or add items manually, and manage party-wise certificates.
+              Upload EFS Excel document or add items manually, with full manual editing and formula recalculations.
             </p>
           </div>
         </div>
@@ -384,7 +435,7 @@ export default function AnalysisCertificatePage() {
           </div>
 
           <div className="space-y-2">
-            <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700">Upload Excel (.xlsx) to AWS S3</label>
+            <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700">Upload Excel (.xlsx)</label>
             <input
               type="file"
               accept=".xlsx, .xls"
@@ -414,7 +465,7 @@ export default function AnalysisCertificatePage() {
               <label className="block text-[11px] text-slate-600 uppercase font-black">HS Code *</label>
               <input
                 type="text"
-                placeholder="e.g. 5206.1300"
+                placeholder="e.g. 5514.2200"
                 value={hsCodeInput}
                 onChange={(e) => setHsCodeInput(e.target.value)}
                 className="w-full p-3 bg-white border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 font-mono focus:outline-none focus:border-blue-600"
@@ -424,7 +475,7 @@ export default function AnalysisCertificatePage() {
               <label className="block text-[11px] text-slate-600 uppercase font-black">Item Description *</label>
               <input
                 type="text"
-                placeholder="e.g. 100% COTTON YARN"
+                placeholder="e.g. TWILL FABRIC"
                 value={descInput}
                 onChange={(e) => setDescInput(e.target.value)}
                 className="w-full p-3 bg-white border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-600"
@@ -506,13 +557,12 @@ export default function AnalysisCertificatePage() {
                       <td className="px-4 py-3.5 text-right text-emerald-700 font-black">{item.requirementQty}</td>
                       <td className="px-4 py-3.5 text-right font-black">{item.wastageQty}</td>
                       <td className="px-4 py-3.5 text-right text-amber-700 font-black">{item.inputWithWastage}</td>
-                      <td className="px-4 py-3.5 text-right font-black">{item.wastagePct}%</td>
+                      <td className="px-4 py-3.5 text-right font-black">{Number(item.wastagePct).toFixed(2)}%</td>
                       <td className="px-4 py-3.5 text-center">
                         <button
                           type="button"
                           onClick={() => handleRemoveParsedItem(idx)}
                           className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition cursor-pointer"
-                          title="Remove Item"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -589,10 +639,11 @@ export default function AnalysisCertificatePage() {
                       
                       <div className="flex items-center gap-2 flex-wrap">
                         <button
-                          onClick={() => setSelectedMobileCertItems({ items: cert.items, certNumber: cert.certificateNumber, partyName: cert.party?.companyName })}
-                          className="block sm:hidden bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase tracking-wider px-3.5 py-2 rounded-xl transition shadow cursor-pointer no-print"
+                          onClick={() => handleOpenEditModal(cert)}
+                          className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white px-3.5 sm:px-4 py-2 rounded-xl transition text-xs font-black uppercase tracking-wider cursor-pointer no-print shadow"
+                          title="Edit Certificate"
                         >
-                          View Items
+                          <Edit3 className="w-4 h-4" /> Edit
                         </button>
 
                         <button
@@ -638,20 +689,15 @@ export default function AnalysisCertificatePage() {
                             <td className="py-3 px-4 text-right text-emerald-700 font-black">{Number(i.requirementQty)}</td>
                             <td className="py-3 px-4 text-right font-black">{Number(i.wastageQty)}</td>
                             <td className="py-3 px-4 text-right text-amber-700 font-black">{Number(i.inputWithWastage)}</td>
-                            <td className="py-3 px-4 text-right font-black">{Number(i.wastagePct)}%</td>
+                            <td className="py-3 px-4 text-right font-black">{Number(i.wastagePct).toFixed(2)}%</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-
-                  <div className="block sm:hidden text-slate-600 text-xs font-bold">
-                    <span>Tap <strong>View Items</strong> to inspect full item breakdown matrix.</span>
-                  </div>
                 </div>
               ))}
 
-              {/* Pagination Controls Bar */}
               <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-100 p-3.5 rounded-2xl border-2 border-slate-300 shadow-sm no-print">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-black text-slate-800 uppercase tracking-wider">Go to page</span>
@@ -662,9 +708,7 @@ export default function AnalysisCertificatePage() {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         const val = Number((e.currentTarget as HTMLInputElement).value);
-                        if (val >= 1 && val <= totalPages) {
-                          setCurrentPage(val);
-                        }
+                        if (val >= 1 && val <= totalPages) setCurrentPage(val);
                       }
                     }}
                     placeholder="Page"
@@ -675,9 +719,7 @@ export default function AnalysisCertificatePage() {
                     onClick={(e) => {
                       const inputEl = (e.currentTarget.previousElementSibling as HTMLInputElement);
                       const val = Number(inputEl?.value);
-                      if (val >= 1 && val <= totalPages) {
-                        setCurrentPage(val);
-                      }
+                      if (val >= 1 && val <= totalPages) setCurrentPage(val);
                     }}
                     className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow cursor-pointer transition"
                   >
@@ -690,42 +732,10 @@ export default function AnalysisCertificatePage() {
                 </div>
 
                 <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setCurrentPage(1)}
-                    disabled={currentPage === 1}
-                    className="p-2.5 bg-white border-2 border-slate-300 rounded-xl disabled:opacity-40 cursor-pointer hover:bg-slate-50 transition shadow-sm"
-                    title="First Page"
-                  >
-                    ⏮
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    className="p-2.5 bg-white border-2 border-slate-300 rounded-xl disabled:opacity-40 cursor-pointer hover:bg-slate-50 transition shadow-sm"
-                    title="Previous Page"
-                  >
-                    ◀
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage >= totalPages}
-                    className="p-2.5 bg-white border-2 border-slate-300 rounded-xl disabled:opacity-40 cursor-pointer hover:bg-slate-50 transition shadow-sm"
-                    title="Next Page"
-                  >
-                    ▶
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCurrentPage(totalPages)}
-                    disabled={currentPage >= totalPages}
-                    className="p-2.5 bg-white border-2 border-slate-300 rounded-xl disabled:opacity-40 cursor-pointer hover:bg-slate-50 transition shadow-sm"
-                    title="Last Page"
-                  >
-                    ⏭
-                  </button>
+                  <button type="button" onClick={() => setCurrentPage(1)} disabled={currentPage === 1} className="p-2.5 bg-white border-2 border-slate-300 rounded-xl disabled:opacity-40 cursor-pointer hover:bg-slate-50 transition">⏮</button>
+                  <button type="button" onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} className="p-2.5 bg-white border-2 border-slate-300 rounded-xl disabled:opacity-40 cursor-pointer hover:bg-slate-50 transition">◀</button>
+                  <button type="button" onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage >= totalPages} className="p-2.5 bg-white border-2 border-slate-300 rounded-xl disabled:opacity-40 cursor-pointer hover:bg-slate-50 transition">▶</button>
+                  <button type="button" onClick={() => setCurrentPage(totalPages)} disabled={currentPage >= totalPages} className="p-2.5 bg-white border-2 border-slate-300 rounded-xl disabled:opacity-40 cursor-pointer hover:bg-slate-50 transition">⏭</button>
                 </div>
               </div>
             </div>
@@ -733,94 +743,186 @@ export default function AnalysisCertificatePage() {
         </div>
       </div>
 
-      <footer className="bg-gradient-to-r from-blue-700 via-blue-900 to-slate-950 text-blue-200 text-center py-4 text-xs sm:text-sm font-bold border-t border-blue-900 w-full shadow-inner rounded-2xl no-print">
-        &copy; 2026 Customs Clearing ERP &bull; Powered by EFS Advanced Compliance Engine. All rights reserved.
-      </footer>
-
-      {confirmModal.isOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-6 shadow-2xl">
-            <div className="space-y-2">
-              <h3 className="text-xl font-black text-slate-900">{confirmModal.title}</h3>
-              <p className="text-xs sm:text-sm font-bold text-slate-600">{confirmModal.message}</p>
-            </div>
-
-            <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-              <button
-                type="button"
-                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
-                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-black uppercase tracking-wider transition cursor-pointer border border-slate-300"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={confirmModal.onConfirm}
-                className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow transition cursor-pointer"
-              >
-                Confirm Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {selectedMobileCertItems && (
+      {/* EDIT MODAL WITH FORMULAS */}
+      {editModal.isOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4 animate-fadeIn">
-          <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-3xl max-w-5xl w-full p-4 sm:p-8 shadow-2xl space-y-6 max-h-[85vh] overflow-y-auto text-slate-900">
+          <div className="bg-white border-2 sm:border-4 border-slate-900 rounded-3xl max-w-6xl w-full p-4 sm:p-8 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto text-slate-900">
             <div className="flex justify-between items-center border-b border-slate-200 pb-4">
               <div>
-                <h3 className="text-lg sm:text-xl font-black text-slate-900">Certificate Items Details</h3>
-                <p className="text-xs sm:text-sm text-blue-700 font-mono font-black mt-1">{selectedMobileCertItems.certNumber}</p>
-                {selectedMobileCertItems.partyName && (
-                  <p className="text-xs sm:text-sm text-slate-600 font-bold mt-0.5">Party: {selectedMobileCertItems.partyName}</p>
-                )}
+                <h3 className="text-xl sm:text-2xl font-black text-slate-900">Edit Analysis Certificate</h3>
+                <p className="text-xs sm:text-sm text-blue-700 font-mono font-black mt-1">Certificate No: {editModal.certNumber}</p>
               </div>
               <button
-                onClick={() => setSelectedMobileCertItems(null)}
+                onClick={() => setEditModal({ isOpen: false, certId: '', certNumber: '', partyId: '', items: [] })}
                 className="text-slate-600 hover:text-slate-900 font-bold text-lg bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-xl cursor-pointer transition"
               >
                 ✕
               </button>
             </div>
 
-            <div className="overflow-x-auto border-2 border-slate-300 rounded-2xl shadow-sm bg-white">
-              <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm font-mono">
-                <thead className="bg-slate-900 text-white font-black uppercase text-[11px] sm:text-xs tracking-wider">
-                  <tr>
-                    <th className="px-4 py-3.5 text-left">S.No.</th>
-                    <th className="px-4 py-3.5 text-left">HS Code</th>
-                    <th className="px-4 py-3.5 text-left">Description</th>
-                    <th className="px-4 py-3.5 text-left">UOM</th>
-                    <th className="px-4 py-3.5 text-right">Req</th>
-                    <th className="px-4 py-3.5 text-right">Wastage</th>
-                    <th className="px-4 py-3.5 text-right">Input</th>
-                    <th className="px-4 py-3.5 text-right">Wast%</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 text-slate-800 font-medium">
-                  {selectedMobileCertItems.items.map((item: any, i: number) => (
-                    <tr key={i} className="hover:bg-slate-50 transition">
-                      <td className="px-4 py-3.5 font-bold">{item.serialNo || i + 1}</td>
-                      <td className="px-4 py-3.5 text-blue-700 font-black">{item.hsCode}</td>
-                      <td className="px-4 py-3.5 font-black text-slate-900">{item.itemDescription}</td>
-                      <td className="px-4 py-3.5 font-black">{item.uom || 'KG'}</td>
-                      <td className="px-4 py-3.5 text-right text-emerald-700 font-black">{Number(item.requirementQty)}</td>
-                      <td className="px-4 py-3.5 text-right font-black">{Number(item.wastageQty)}</td>
-                      <td className="px-4 py-3.5 text-right text-amber-700 font-black">{Number(item.inputWithWastage)}</td>
-                      <td className="px-4 py-3.5 text-right font-black">{Number(item.wastagePct)}%</td>
+            <div className="space-y-4">
+              <div className="space-y-2 max-w-sm">
+                <label className="block text-xs font-black uppercase text-slate-700">Certificate Number</label>
+                <input
+                  type="text"
+                  value={editModal.certNumber}
+                  onChange={(e) => setEditModal(prev => ({ ...prev, certNumber: e.target.value }))}
+                  className="w-full p-3 bg-slate-50 border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold font-mono focus:outline-none focus:border-blue-600"
+                />
+              </div>
+
+              <h4 className="text-sm font-black uppercase tracking-wider text-slate-800 pt-2">Modify Certificate Items (Formulas auto-calculated)</h4>
+              
+              <div className="overflow-x-auto border-2 border-slate-300 rounded-2xl shadow-sm bg-white">
+                <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm font-mono">
+                  <thead className="bg-slate-900 text-white font-black uppercase text-[11px] sm:text-xs tracking-wider">
+                    <tr>
+                      <th className="px-3 py-3 text-left">S.No</th>
+                      <th className="px-3 py-3 text-left">HS Code</th>
+                      <th className="px-3 py-3 text-left">Item Description</th>
+                      <th className="px-3 py-3 text-left">UOM</th>
+                      <th className="px-3 py-3 text-right">Requirement</th>
+                      <th className="px-3 py-3 text-right">Wastage (KG)</th>
+                      <th className="px-3 py-3 text-right">Input w/ Wastage</th>
+                      <th className="px-3 py-3 text-right">Wastage %</th>
+                      <th className="px-3 py-3 text-center">Action</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 text-slate-800 font-medium">
+                    {editModal.items.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50">
+                        <td className="px-3 py-3 font-bold">{item.serialNo}</td>
+                        <td className="px-3 py-3">
+                          <input
+                            type="text"
+                            value={item.hsCode}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setEditModal(prev => {
+                                const newItems = [...prev.items];
+                                newItems[idx].hsCode = val;
+                                return { ...prev, items: newItems };
+                              });
+                            }}
+                            className="w-28 p-2 bg-white border border-slate-300 rounded-lg text-xs font-bold font-mono"
+                          />
+                        </td>
+                        <td className="px-3 py-3">
+                          <input
+                            type="text"
+                            value={item.itemDescription}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setEditModal(prev => {
+                                const newItems = [...prev.items];
+                                newItems[idx].itemDescription = val;
+                                return { ...prev, items: newItems };
+                              });
+                            }}
+                            className="w-56 p-2 bg-white border border-slate-300 rounded-lg text-xs font-bold"
+                          />
+                        </td>
+                        <td className="px-3 py-3">
+                          <input
+                            type="text"
+                            value={item.uom}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setEditModal(prev => {
+                                const newItems = [...prev.items];
+                                newItems[idx].uom = val;
+                                return { ...prev, items: newItems };
+                              });
+                            }}
+                            className="w-16 p-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-center"
+                          />
+                        </td>
+                        {/* REQUIREMENT INPUT WITH FORMULA TRIGGER */}
+                        <td className="px-3 py-3 text-right">
+                          <input
+                            type="number"
+                            step="any"
+                            value={item.requirementQty}
+                            onChange={(e) => {
+                              const reqVal = parseFloat(e.target.value) || 0;
+                              setEditModal(prev => {
+                                const newItems = [...prev.items];
+                                newItems[idx].requirementQty = reqVal;
+                                const wastKg = newItems[idx].wastageQty;
+                                const inputWast = reqVal + wastKg; // Formula 1
+                                newItems[idx].inputWithWastage = inputWast;
+                                newItems[idx].wastagePct = inputWast > 0 ? (wastKg / inputWast) * 100 : 0; // Formula 2
+                                return { ...prev, items: newItems };
+                              });
+                            }}
+                            className="w-24 p-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-right font-mono"
+                          />
+                        </td>
+                        {/* WASTAGE KG INPUT WITH FORMULA TRIGGER */}
+                        <td className="px-3 py-3 text-right">
+                          <input
+                            type="number"
+                            step="any"
+                            value={item.wastageQty}
+                            onChange={(e) => {
+                              const wastKg = parseFloat(e.target.value) || 0;
+                              setEditModal(prev => {
+                                const newItems = [...prev.items];
+                                newItems[idx].wastageQty = wastKg;
+                                const reqVal = newItems[idx].requirementQty;
+                                const inputWast = reqVal + wastKg; // Formula 1
+                                newItems[idx].inputWithWastage = inputWast;
+                                newItems[idx].wastagePct = inputWast > 0 ? (wastKg / inputWast) * 100 : 0; // Formula 2
+                                return { ...prev, items: newItems };
+                              });
+                            }}
+                            className="w-24 p-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-right font-mono"
+                          />
+                        </td>
+                        {/* INPUT W/ WASTAGE (Auto calculated display) */}
+                        <td className="px-3 py-3 text-right font-black text-amber-700">
+                          {item.inputWithWastage}
+                        </td>
+                        {/* WASTAGE % (Auto calculated display) */}
+                        <td className="px-3 py-3 text-right font-black text-blue-700">
+                          {Number(item.wastagePct).toFixed(2)}%
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditModal(prev => ({
+                                ...prev,
+                                items: prev.items.filter((_, i) => i !== idx).map((it, i) => ({ ...it, serialNo: i + 1 }))
+                              }));
+                            }}
+                            className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
-            <div className="mt-6 text-right">
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
               <button
-                onClick={() => setSelectedMobileCertItems(null)}
-                className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs sm:text-sm uppercase tracking-wider px-6 py-3 rounded-xl transition cursor-pointer"
+                type="button"
+                onClick={() => setEditModal({ isOpen: false, certId: '', certNumber: '', partyId: '', items: [] })}
+                className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-black uppercase tracking-wider transition cursor-pointer"
               >
-                Close
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleUpdateCertificate}
+                disabled={loading}
+                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow transition cursor-pointer"
+              >
+                {loading ? 'Updating...' : 'Save Changes'}
               </button>
             </div>
           </div>

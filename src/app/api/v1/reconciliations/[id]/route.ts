@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { Decimal } from '@prisma/client/runtime/library';
 
 export async function DELETE(
   req: NextRequest,
@@ -42,29 +43,28 @@ export async function PUT(
       return NextResponse.json({ success: false, error: 'Item not found' }, { status: 404 });
     }
 
-    const expQty = Number(exportQtyKg ?? existingItem.exportQtyKg ?? 0);
-    const expVal = Number(exportValuePkr ?? existingItem.exportValuePkr ?? 0);
-    const totalConsumed = Number(consumptionIncWastage ?? existingItem.consumptionIncWastage ?? 0);
-    const wastageKg = Number(actualWastageKg ?? (existingItem as any).actualWastageKg ?? 0);
+    const expQty = Number(exportQtyKg ?? existingItem.exportQtyKg?.toString() ?? 0);
+    const expVal = Number(exportValuePkr ?? existingItem.exportValuePkr?.toString() ?? 0);
+    const totalConsumed = Number(consumptionIncWastage ?? existingItem.consumptionIncWastage?.toString() ?? 0);
+    const wastageKg = Number(actualWastageKg ?? existingItem.actualWastageKg?.toString() ?? 0);
 
-    const importQty = Number(existingItem.importQtyKg ?? 0);
-    const importVal = Number(existingItem.importValuePkr ?? 0);
+    const importQty = Number(existingItem.importQtyKg?.toString() ?? 0);
+    const importVal = Number(existingItem.importValuePkr?.toString() ?? 0);
 
     const closingBalanceKg = importQty - totalConsumed;
     const unitRate = importQty > 0 ? importVal / importQty : 0;
     const consumedVal = unitRate * totalConsumed;
     const valueAddition = expVal > 0 ? (consumedVal / expVal) * 100 : 0;
 
-    // Strict payload matching exact prisma schema fields only
     const updatedItem = await prisma.reconciliationItem.update({
       where: { id },
       data: {
-        exportQtyKg: expQty,
-        exportValuePkr: expVal,
-        consumptionIncWastage: totalConsumed,
-        actualWastageKg: wastageKg,
-        closingBalanceKg: closingBalanceKg,
-        valueAddition: valueAddition,
+        exportQtyKg: new Decimal(expQty),
+        exportValuePkr: new Decimal(expVal),
+        consumptionIncWastage: new Decimal(totalConsumed),
+        actualWastageKg: new Decimal(wastageKg),
+        closingBalanceKg: new Decimal(closingBalanceKg),
+        valueAddition: new Decimal(valueAddition),
       },
     });
 
