@@ -75,13 +75,12 @@ export default function InputOutputDetailsPage() {
 
   const partyDropdownRef = useRef<HTMLDivElement>(null);
 
-  const formatNumber = (val: any, decimals: number = 2) => {
+  // Updated formatNumber function without forced decimals or rounding off
+  const formatNumber = (val: any) => {
+    if (val === null || val === undefined || val === '') return '0';
     const num = Number(val);
-    if (isNaN(num) || num === null || num === undefined) return '0';
-    return num.toLocaleString('en-US', {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    });
+    if (isNaN(num)) return String(val);
+    return num.toString();
   };
 
   const importItemQty = Number(selectedImportItem?.quantity ?? selectedImportItem?.netWeight ?? 0);
@@ -108,7 +107,7 @@ export default function InputOutputDetailsPage() {
   const currentCertNumber = firstSelectedCertKey || selectedExportItem?.analysisCertNo || 'N/A';
   
   const totalConsumedQty = exportQty * certInputWithWastage;
-  const totalWastageQty = exportQty * certWastQtyPerUnit; 
+  const totalWastageQty = certWastQtyPerUnit * exportQty; 
 
   const unitImportRate = importItemQty > 0 ? (importItemVal / importItemQty) : 0;
   const totalConsumedValue = unitImportRate * totalConsumedQty;
@@ -162,6 +161,10 @@ export default function InputOutputDetailsPage() {
     }
     if (!activeCertItem) {
       showToast('Error: Please select an item from the Analysis Certificate cards!', 'error');
+      return;
+    }
+    if (!currentCertNumber || currentCertNumber === 'N/A') {
+      showToast('Error: Valid Analysis Certificate Number is required!', 'error');
       return;
     }
 
@@ -483,22 +486,22 @@ export default function InputOutputDetailsPage() {
         idx + 1,
         idx === 0 ? (rec.importGdNo || importGdNo) : "",
         idx === 0 ? (rec.importParticulars || rec.inputDescription || itemDesc) : "",
-        idx === 0 ? formatNumber(rec.importQty || rec.importQtyKg || 0, 0) : "",
-        idx === 0 ? formatNumber(rec.importValue || rec.importValuePkr || 0, 2) : "",
+        idx === 0 ? formatNumber(rec.importQty || rec.importQtyKg || 0) : "",
+        idx === 0 ? formatNumber(rec.importValue || rec.importValuePkr || 0) : "",
         idx === 0 ? (rec.importHsCode || rec.inputPct || "N/A") : "",
         rec.analysisCertNo || "N/A",
-        formatNumber(rec.requirementQty || rec.netIocoConsumption || 0, 4),
-        formatNumber(rec.wastageQty || rec.iocoWastageQty || 0, 4),
-        formatNumber(rec.grossIocoConsumption || rec.inputWithWastage || 0, 4),
-        formatNumber(rec.wastagePct || rec.wastagePercentage || 0, 2) + "%",
+        formatNumber(rec.requirementQty || rec.netIocoConsumption || 0),
+        formatNumber(rec.wastageQty || rec.iocoWastageQty || 0),
+        formatNumber(rec.grossIocoConsumption || rec.inputWithWastage || 0),
+        formatNumber(rec.wastagePct || rec.wastagePercentage || 0) + "%",
         rec.exportGdNo || "N/A",
         rec.exportDescription || "Export Item",
-        formatNumber(rec.resolvedExportQty, 0),
-        formatNumber(rec.exportValuePkr || 0, 2),
-        formatNumber(rec.resolvedTotalConsumed, 4),
-        formatNumber(rec.resolvedWastageQty, 4),
-        formatNumber(rec.computedClosingBalance, 4),
-        formatNumber(rec.valueAddition || 0, 2) + "%"
+        formatNumber(rec.resolvedExportQty),
+        formatNumber(rec.exportValuePkr || 0),
+        formatNumber(rec.resolvedTotalConsumed),
+        formatNumber(rec.resolvedWastageQty),
+        formatNumber(rec.computedClosingBalance),
+        formatNumber(rec.valueAddition || 0) + "%"
       ];
       
       csvContent += rowData.map(val => `"${String(val ?? "").replace(/"/g, '""')}"`).join(",") + "\n";
@@ -509,8 +512,8 @@ export default function InputOutputDetailsPage() {
     
     let totalRow = Array(19).fill('""');
     totalRow[14] = `"TOTAL"`;
-    totalRow[15] = `"${formatNumber(totalConsumedSum, 4)}"`;
-    totalRow[16] = `"${formatNumber(totalWastageSum, 4)}"`;
+    totalRow[15] = `"${formatNumber(totalConsumedSum)}"`;
+    totalRow[16] = `"${formatNumber(totalWastageSum)}"`;
     csvContent += totalRow.join(",") + "\n";
 
     const encodedUri = encodeURI(csvContent);
@@ -929,9 +932,9 @@ export default function InputOutputDetailsPage() {
                                 <td className="px-3 sm:px-5 py-3.5 font-bold text-slate-700">{idx + 1}</td>
                                 <td className="px-3 sm:px-5 py-3.5 font-black text-slate-900">{description}</td>
                                 <td className="px-3 sm:px-5 py-3.5 font-mono font-black text-slate-900">{hsCode}</td>
-                                <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(qty, 0)}</td>
+                                <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(qty)}</td>
                                 <td className="px-3 sm:px-5 py-3.5 font-mono font-black text-slate-700">{uom}</td>
-                                <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(val, 2)}</td>
+                                <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(val)}</td>
                               </tr>
                             );
                           })}
@@ -1082,7 +1085,7 @@ export default function InputOutputDetailsPage() {
                               <td className="px-3 sm:px-5 py-3.5 font-mono font-black text-blue-700">{certNo}</td>
                               <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-900" onClick={(e) => e.stopPropagation()}>
                                 <div className="flex items-center justify-end gap-2">
-                                  <span>{formatNumber(qty, 0)}</span>
+                                  <span>{formatNumber(qty)}</span>
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -1097,7 +1100,7 @@ export default function InputOutputDetailsPage() {
                                 </div>
                               </td>
                               <td className="px-3 sm:px-5 py-3.5 font-mono font-black text-slate-700">{uom}</td>
-                              <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(val, 2)}</td>
+                              <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(val)}</td>
                             </tr>
                           );
                         })}
@@ -1207,10 +1210,10 @@ export default function InputOutputDetailsPage() {
                                       <td className="px-3 sm:px-5 py-3.5 font-black text-slate-900">{description}</td>
                                       <td className="px-3 sm:px-5 py-3.5 font-mono font-black text-slate-900">{hsCode}</td>
                                       <td className="px-3 sm:px-5 py-3.5 font-mono font-black text-slate-700">{uom}</td>
-                                      <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-blue-700">{formatNumber(qty, 4)}</td>
-                                      <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-700">{formatNumber(wastQty, 4)}</td>
-                                      <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(inputWast, 4)}</td>
-                                      <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-emerald-700">{formatNumber(wastage, 2)}%</td>
+                                      <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-blue-700">{formatNumber(qty)}</td>
+                                      <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-700">{formatNumber(wastQty)}</td>
+                                      <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(inputWast)}</td>
+                                      <td className="px-3 sm:px-5 py-3.5 text-right font-mono font-black text-emerald-700">{formatNumber(wastage)}%</td>
                                     </tr>
                                   );
                                 })}
@@ -1263,39 +1266,39 @@ export default function InputOutputDetailsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           <div className="bg-slate-50 p-4 sm:p-6 rounded-2xl border-2 border-slate-300 hover:border-blue-500 transition space-y-2">
             <span className="text-xs sm:text-sm text-slate-700 uppercase tracking-wider block font-black">Export Quantity (GD)</span>
-            <span className="font-mono font-black text-slate-900 text-lg sm:text-xl block">{formatNumber(exportQty, 0)} {exportItemUom}</span>
+            <span className="font-mono font-black text-slate-900 text-lg sm:text-xl block">{formatNumber(exportQty)} {exportItemUom}</span>
           </div>
 
           <div className="bg-slate-50 p-4 sm:p-6 rounded-2xl border-2 border-blue-300 hover:border-blue-600 transition space-y-2">
             <span className="text-xs sm:text-sm text-slate-700 uppercase tracking-wider block font-black">Consumption as per IOCO (Net IOR)</span>
-            <span className="font-mono font-black text-blue-700 text-lg sm:text-xl block">{formatNumber(certReqQty, 4)}</span>
+            <span className="font-mono font-black text-blue-700 text-lg sm:text-xl block">{formatNumber(certReqQty)}</span>
           </div>
 
           <div className="bg-blue-50 border-2 border-blue-500 ring-2 ring-blue-100 p-4 sm:p-6 rounded-2xl space-y-2">
             <span className="text-xs sm:text-sm text-blue-800 uppercase tracking-wider font-black block">Total Consumed Qty</span>
-            <span className="font-mono font-black text-blue-700 text-lg sm:text-xl block">{formatNumber(totalConsumedQty, 4)} {importItemUom}</span>
+            <span className="font-mono font-black text-blue-700 text-lg sm:text-xl block">{formatNumber(totalConsumedQty)} {importItemUom}</span>
           </div>
 
           <div className="bg-slate-50 p-4 sm:p-6 rounded-2xl border-2 border-slate-300 hover:border-blue-500 transition space-y-2">
             <span className="text-xs sm:text-sm text-slate-700 uppercase tracking-wider block font-black">Total Consumed Value</span>
-            <span className="font-mono font-black text-slate-900 text-lg sm:text-xl block">{formatNumber(totalConsumedValue, 2)}</span>
+            <span className="font-mono font-black text-slate-900 text-lg sm:text-xl block">{formatNumber(totalConsumedValue)}</span>
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 max-w-5xl mx-auto pt-2">
           <div className="bg-slate-50 border-2 border-slate-300 hover:border-amber-500 transition p-4 sm:p-6 rounded-2xl space-y-2 text-center">
             <span className="text-xs sm:text-sm text-slate-700 uppercase tracking-wider block font-black">Total Wastage Qty</span>
-            <span className="font-mono font-black text-slate-900 text-lg sm:text-xl block">{formatNumber(totalWastageQty, 4)} {importItemUom}</span>
+            <span className="font-mono font-black text-slate-900 text-lg sm:text-xl block">{formatNumber(totalWastageQty)} {importItemUom}</span>
           </div>
 
           <div className="bg-slate-50 border-2 border-emerald-400 hover:border-emerald-600 transition p-4 sm:p-6 rounded-2xl space-y-2 text-center">
             <span className="text-xs sm:text-sm text-slate-700 uppercase tracking-wider block font-black">Balanced Quantity</span>
-            <span className="font-mono font-black text-emerald-700 text-lg sm:text-xl block">{formatNumber(displayBalancedQty, 4)} {importItemUom}</span>
+            <span className="font-mono font-black text-emerald-700 text-lg sm:text-xl block">{formatNumber(displayBalancedQty)} {importItemUom}</span>
           </div>
 
           <div className="bg-slate-50 border-2 border-slate-300 hover:border-blue-500 transition p-4 sm:p-6 rounded-2xl space-y-2 text-center">
             <span className="text-xs sm:text-sm text-slate-700 uppercase tracking-wider block font-black">Balanced Value</span>
-            <span className="font-mono font-black text-slate-900 text-lg sm:text-xl block">{formatNumber(displayBalancedValue, 2)}</span>
+            <span className="font-mono font-black text-slate-900 text-lg sm:text-xl block">{formatNumber(displayBalancedValue)}</span>
           </div>
         </div>
       </div>
@@ -1451,7 +1454,7 @@ export default function InputOutputDetailsPage() {
                   <div className="flex items-center gap-3">
                     <FileText className="w-6 h-6 text-blue-600 flex-shrink-0" />
                     <h3 className="text-xs sm:text-base font-black text-slate-900 uppercase tracking-wide">
-                      GD: <span className="text-blue-700 font-mono">{importGdNo}</span> &bull; Item: <span className="text-slate-800">{itemDesc}</span> &bull; Qty: <span className="text-blue-700 font-mono">{formatNumber(impQtyStr, 0)}</span>
+                      GD: <span className="text-blue-700 font-mono">{importGdNo}</span> &bull; Item: <span className="text-slate-800">{itemDesc}</span> &bull; Qty: <span className="text-blue-700 font-mono">{formatNumber(impQtyStr)}</span>
                     </h3>
                   </div>
 
@@ -1540,10 +1543,10 @@ export default function InputOutputDetailsPage() {
                             {idx === 0 ? (rec.importParticulars || rec.inputDescription || itemDesc) : ''}
                           </td>
                           <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">
-                            {idx === 0 ? formatNumber(rec.importQty || rec.importQtyKg || 0, 0) : ''}
+                            {idx === 0 ? formatNumber(rec.importQty || rec.importQtyKg || 0) : ''}
                           </td>
                           <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">
-                            {idx === 0 ? formatNumber(rec.importValue || rec.importValuePkr || 0, 2) : ''}
+                            {idx === 0 ? formatNumber(rec.importValue || rec.importValuePkr || 0) : ''}
                           </td>
                           <td className="px-3 py-3.5 font-mono font-black text-slate-800">
                             {idx === 0 ? (rec.importHsCode || rec.inputPct || 'N/A') : ''}
@@ -1551,18 +1554,18 @@ export default function InputOutputDetailsPage() {
                           <td className="px-3 py-3.5 font-mono font-black text-slate-800">
                             {rec.analysisCertNo || 'N/A'}
                           </td>
-                          <td className="px-3 py-3.5 text-right font-mono font-black text-blue-700">{formatNumber(rec.requirementQty || rec.netIocoConsumption || 0, 4)}</td>
-                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-700">{formatNumber(rec.wastageQty || rec.iocoWastageQty || 0, 4)}</td>
-                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.grossIocoConsumption || rec.inputWithWastage || 0, 4)}</td>
-                          <td className="px-3 py-3.5 text-right font-mono font-black text-emerald-700">{formatNumber(rec.wastagePct || rec.wastagePercentage || 0, 2)}%</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-blue-700">{formatNumber(rec.requirementQty || rec.netIocoConsumption || 0)}</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-700">{formatNumber(rec.wastageQty || rec.iocoWastageQty || 0)}</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.grossIocoConsumption || rec.inputWithWastage || 0)}</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-emerald-700">{formatNumber(rec.wastagePct || rec.wastagePercentage || 0)}%</td>
                           <td className="px-3 py-3.5 font-mono font-black text-blue-700">{rec.exportGdNo || 'N/A'}</td>
                           <td className="px-3 py-3.5 font-black text-slate-900">{rec.exportDescription || 'Export Item'}</td>
-                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.resolvedExportQty, 0)} {rec.uom || ''}</td>
-                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.exportValuePkr || 0, 2)}</td>
-                          <td className="px-3 py-3.5 text-right font-mono font-black text-blue-700">{formatNumber(rec.resolvedTotalConsumed, 4)}</td>
-                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-700">{formatNumber(rec.resolvedWastageQty, 4)}</td>
-                          <td className="px-3 py-3.5 text-right font-mono font-black text-emerald-700">{formatNumber(rec.computedClosingBalance, 4)}</td>
-                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.valueAddition || 0, 2)}%</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.resolvedExportQty)} {rec.uom || ''}</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.exportValuePkr || 0)}</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-blue-700">{formatNumber(rec.resolvedTotalConsumed)}</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-700">{formatNumber(rec.resolvedWastageQty)}</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-emerald-700">{formatNumber(rec.computedClosingBalance)}</td>
+                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.valueAddition || 0)}%</td>
                           <td className="px-3 py-3.5 text-center no-print">
                             <div className="flex items-center justify-center gap-2">
                               <button
@@ -1583,10 +1586,10 @@ export default function InputOutputDetailsPage() {
                           TOTAL:
                         </td>
                         <td className="px-4 py-4 text-right font-mono text-cyan-400 text-xs sm:text-sm">
-                          {formatNumber(exactTotalConsumed, 4)}
+                          {formatNumber(exactTotalConsumed)}
                         </td>
                         <td className="px-4 py-4 text-right font-mono text-amber-400 text-xs sm:text-sm">
-                          {formatNumber(exactTotalWastage, 4)}
+                          {formatNumber(exactTotalWastage)}
                         </td>
                         <td colSpan={2} className="px-4 py-4"></td>
                         <td className="px-4 py-4 text-center no-print"></td>
@@ -1710,8 +1713,7 @@ export default function InputOutputDetailsPage() {
                 {formatNumber(
                   (Number(editingExportQtyItem.qtyOfExports ?? editingExportQtyItem.quantity ?? 1) > 0 
                     ? (Number(editingExportQtyItem.valueOfeExports ?? editingExportQtyItem.fobValueVal ?? 0) / Number(editingExportQtyItem.qtyOfExports ?? editingExportQtyItem.quantity ?? 1)) * Number(tempExportQtyVal || 0)
-                    : Number(editingExportQtyItem.valueOfeExports ?? editingExportQtyItem.fobValueVal ?? 0)), 
-                  2
+                    : Number(editingExportQtyItem.valueOfeExports ?? editingExportQtyItem.fobValueVal ?? 0))
                 )} Rs.
               </span>
             </div>

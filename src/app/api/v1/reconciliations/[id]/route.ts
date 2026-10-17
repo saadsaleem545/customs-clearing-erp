@@ -29,7 +29,17 @@ export async function PUT(
   try {
     const { id } = params;
     const body = await req.json();
-    const { exportQtyKg, exportValuePkr, consumptionIncWastage, actualWastageKg } = body;
+    const { 
+      exportQtyKg, 
+      exportValuePkr, 
+      consumptionIncWastage, 
+      actualWastageKg,
+      importGdNo,
+      inputDescription,
+      analysisCertNo,
+      importQtyKg,
+      importValuePkr
+    } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'ID is required' }, { status: 400 });
@@ -48,8 +58,8 @@ export async function PUT(
     const totalConsumed = Number(consumptionIncWastage ?? existingItem.consumptionIncWastage?.toString() ?? 0);
     const wastageKg = Number(actualWastageKg ?? existingItem.actualWastageKg?.toString() ?? 0);
 
-    const importQty = Number(existingItem.importQtyKg?.toString() ?? 0);
-    const importVal = Number(existingItem.importValuePkr?.toString() ?? 0);
+    const importQty = Number(importQtyKg ?? existingItem.importQtyKg?.toString() ?? 0);
+    const importVal = Number(importValuePkr ?? existingItem.importValuePkr?.toString() ?? 0);
 
     const closingBalanceKg = importQty - totalConsumed;
     const unitRate = importQty > 0 ? importVal / importQty : 0;
@@ -65,6 +75,12 @@ export async function PUT(
         actualWastageKg: new Decimal(wastageKg),
         closingBalanceKg: new Decimal(closingBalanceKg),
         valueAddition: new Decimal(valueAddition),
+        // Naye fields jo ab easily update ho sakein ge
+        ...(importGdNo !== undefined && { importGdNo }),
+        ...(inputDescription !== undefined && { inputDescription }),
+        ...(analysisCertNo !== undefined && { analysisCertNo }),
+        ...(importQtyKg !== undefined && { importQtyKg: new Decimal(importQty) }),
+        ...(importValuePkr !== undefined && { importValuePkr: new Decimal(importVal) }),
       },
     });
 

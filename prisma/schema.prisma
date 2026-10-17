@@ -180,7 +180,7 @@ model ExportGdItem {
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
   exportGd              ExportGd             @relation(fields: [exportGdId], references: [id], onDelete: Cascade)
-  analysisCertificate   AnalysisCertificate? @relation(fields: [analysisCertificateId], references: [id], onDelete: SetNull) 
+  analysisCertificate   AnalysisCertificate? @relation(fields: [analysisCertificateId], references: [id], onDelete: SetNull)  
 
   @@map("export_gd_items")
 }
@@ -245,6 +245,7 @@ model ReconciliationItem {
   importValuePkr        Decimal              @db.Decimal(15, 2)
   inputPct              String
   analysisCertNo        String?
+  analysisCertificateId String?              // Added relation field
   netIocoConsumption    Decimal              @db.Decimal(15, 6)
   iocoWastageQty        Decimal              @db.Decimal(15, 6)
   grossIocoConsumption  Decimal              @db.Decimal(15, 6)
@@ -263,6 +264,7 @@ model ReconciliationItem {
   exportGd              ExportGd?            @relation(fields: [exportGdId], references: [id])
   inputMaterial         InputMaterial        @relation(fields: [inputMaterialId], references: [id], onDelete: Cascade)
   reconciliation        Reconciliation       @relation(fields: [reconciliationId], references: [id], onDelete: Cascade)
+  analysisCertificate   AnalysisCertificate? @relation(fields: [analysisCertificateId], references: [id], onDelete: SetNull) // Added relation
 
   @@map("reconciliation_items")
 }
@@ -302,15 +304,16 @@ model AuditLog {
 }
 
 model AnalysisCertificate {
-  id                String             @id @default(uuid())
-  certificateNumber String             @unique
-  partyId           String
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  items             AnalysisCertItem[]
-  party             Party              @relation(fields: [partyId], references: [id], onDelete: Cascade)
-  exportGds         ExportGd[]
-  exportGdItems     ExportGdItem[]     
+  id                  String               @id @default(uuid())
+  certificateNumber   String               @unique
+  partyId             String
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  items               AnalysisCertItem[]
+  party               Party                @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  exportGds           ExportGd[]
+  exportGdItems       ExportGdItem[]
+  reconciliationItems ReconciliationItem[] // Added relation
 
   @@map("analysis_certificates")
 }

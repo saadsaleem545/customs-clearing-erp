@@ -55,7 +55,6 @@ export async function POST(req: NextRequest) {
           partyId,
           items: {
             create: items.map((item: any, idx: number) => {
-              // Exact string conversion taake user ki di hui saari decimal values preserve rahein
               const reqQtyStr = String(item.requirementQty ?? '0');
               const wastQtyStr = String(item.wastageQty ?? '0');
               
@@ -112,7 +111,6 @@ export async function PUT(req: NextRequest) {
           partyId,
           items: {
             create: items.map((item: any, idx: number) => {
-              // Exact string conversion taake decimals truncate na hon
               const reqQtyStr = String(item.requirementQty ?? '0');
               const wastQtyStr = String(item.wastageQty ?? '0');
               
@@ -138,16 +136,17 @@ export async function PUT(req: NextRequest) {
         include: { items: true, party: true },
       });
 
-      // 3. Automatic Synchronization for Saved Reconciliations
+      // 3. Automatic Synchronization for Saved Reconciliations with Robust Fallback Match
       for (const newItem of cert.items) {
-        await tx.reconciliationItem.updateMany({
+        // A. Try matching by Certificate Number and Item Description
+        let updateResult = await tx.reconciliationItem.updateMany({
           where: {
             OR: [
               { analysisCertNo: cert.certificateNumber },
               { analysisCertNo: certificateNumber.trim() }
             ],
             inputDescription: {
-              contains: newItem.itemDescription,
+              contains: newItem.itemDescription.trim(),
               mode: 'insensitive',
             },
           },
@@ -158,6 +157,28 @@ export async function PUT(req: NextRequest) {
             wastagePercentage: newItem.wastagePct,
           },
         });
+
+        // B. Fallback: If not found (e.g. due to 'N/A' or missing certificate number), match by Party and Item Description
+        if (updateResult.count === 0) {
+          await tx.reconciliationItem.updateMany({
+            where: {
+              inputDescription: {
+                contains: newItem.itemDescription.trim(),
+                mode: 'insensitive',
+              },
+              reconciliation: {
+                partyId: partyId,
+              },
+            },
+            data: {
+              analysisCertNo: cert.certificateNumber, // Automatically corrects 'N/A' to correct certificate number
+              netIocoConsumption: newItem.requirementQty,
+              iocoWastageQty: newItem.wastageQty,
+              grossIocoConsumption: newItem.inputWithWastage,
+              wastagePercentage: newItem.wastagePct,
+            },
+          });
+        }
       }
 
       return cert;
