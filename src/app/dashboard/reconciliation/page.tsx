@@ -75,7 +75,7 @@ export default function InputOutputDetailsPage() {
 
   const partyDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Updated formatNumber function without forced decimals or rounding off
+  // Exact unrounded formatNumber function
   const formatNumber = (val: any) => {
     if (val === null || val === undefined || val === '') return '0';
     const num = Number(val);
