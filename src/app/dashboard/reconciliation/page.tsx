@@ -75,12 +75,10 @@ export default function InputOutputDetailsPage() {
 
   const partyDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Exact unrounded formatNumber function
+  // Exact unrounded formatNumber function without any rounding
   const formatNumber = (val: any) => {
     if (val === null || val === undefined || val === '') return '0';
-    const num = Number(val);
-    if (isNaN(num)) return String(val);
-    return num.toString();
+    return String(val);
   };
 
   const importItemQty = Number(selectedImportItem?.quantity ?? selectedImportItem?.netWeight ?? 0);
@@ -94,7 +92,7 @@ export default function InputOutputDetailsPage() {
   const exportVal = Number(selectedExportItem?.valueOfeExports || selectedExportItem?.fobValueVal || selectedExportItem?.fobValue || selectedExportItem?.value || 0);
   const exportGdNumber = selectedExportGdObject?.exportGdNumber || selectedExportGdObject?.gdNumber || selectedExportItem?.exportGdNo || 'N/A';
   const exportDesc = selectedExportItem?.exportParticulars || selectedExportItem?.itemDescription || selectedExportItem?.description || 'Export Item';
-  const exportItemUom = selectedExportItem?.unit || selectedExportItem?.uom || 'KG';
+  const exportItemUom = (selectedExportItem?.unit || selectedExportItem?.uom || '').replace(/^u$/i, '').trim();
 
   const firstSelectedCertKey = Object.keys(selectedCertItemsMap)[0];
   const activeCertItem = firstSelectedCertKey ? selectedCertItemsMap[firstSelectedCertKey] : null;
@@ -1064,7 +1062,7 @@ export default function InputOutputDetailsPage() {
                           const hsCode = item.exportHsCode || item.hsCode || 'N/A';
                           const certNo = item.analysisCertNo || 'N/A';
                           const qty = item.qtyOfExports ?? item.quantity ?? 0;
-                          const uom = item.unit || item.uom || 'KG';
+                          const uom = (item.unit || item.uom || '').replace(/^u$/i, '').trim();
                           const val = item.valueOfeExports ?? item.fobValueVal ?? 0;
                           const isItemSel = selectedExportItem?.id === item.id;
 
