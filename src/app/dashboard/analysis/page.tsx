@@ -54,18 +54,6 @@ export default function AnalysisCertificatePage() {
     }, 4000);
   };
 
-  const [confirmModal, setConfirmModal] = useState<{
-    isOpen: boolean;
-    title: string;
-    message: string;
-    onConfirm: () => void;
-  }>({
-    isOpen: false,
-    title: '',
-    message: '',
-    onConfirm: () => {},
-  });
-
   const [hsCodeInput, setHsCodeInput] = useState('');
   const [descInput, setDescInput] = useState('');
   const [uomInput, setUomInput] = useState('KG');
@@ -144,13 +132,11 @@ export default function AnalysisCertificatePage() {
             const hsCode = String(row[0] || '').trim();
             const desc = String(row[1] || '').trim();
             const uom = String(row[2] || 'KG').trim();
-            const reqQty = row[3] !== undefined && row[3] !== '' ? String(row[3]) : '0';
-            const wastQty = row[4] !== undefined && row[4] !== '' ? String(row[4]) : '0';
+            const reqQty = row[3] !== undefined && row[3] !== '' ? Number(row[3]) : 0;
+            const wastQty = row[4] !== undefined && row[4] !== '' ? Number(row[4]) : 0;
             
-            const reqNum = parseFloat(reqQty) || 0;
-            const wastNum = parseFloat(wastQty) || 0;
-            const inputWast = reqNum + wastNum;
-            const wastPct = inputWast > 0 ? (wastNum / inputWast) * 100 : 0;
+            const inputWast = reqNumCheck(reqQty) + reqNumCheck(wastQty);
+            const wastPct = inputWast > 0 ? (reqNumCheck(wastQty) / inputWast) * 100 : 0;
 
             if (hsCode && desc) {
               extractedItems.push({
@@ -160,8 +146,8 @@ export default function AnalysisCertificatePage() {
                 uom,
                 requirementQty: reqQty,
                 wastageQty: wastQty,
-                inputWithWastage: inputWast.toString(),
-                wastagePct: wastPct.toString(),
+                inputWithWastage: inputWast,
+                wastagePct: wastPct,
               });
             }
           }
@@ -183,6 +169,11 @@ export default function AnalysisCertificatePage() {
     reader.readAsBinaryString(file);
   };
 
+  const reqNumCheck = (val: any) => {
+    const num = parseFloat(val);
+    return isNaN(num) ? 0 : num;
+  };
+
   const handleAddManualItem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!hsCodeInput || !descInput || !reqQtyInput) {
@@ -190,8 +181,8 @@ export default function AnalysisCertificatePage() {
       return;
     }
 
-    const reqNum = parseFloat(reqQtyInput) || 0;
-    const wastNum = parseFloat(wastQtyInput) || 0;
+    const reqNum = reqNumCheck(reqQtyInput);
+    const wastNum = reqNumCheck(wastQtyInput);
     const inputWast = reqNum + wastNum;
     const wastPct = inputWast > 0 ? (wastNum / inputWast) * 100 : 0;
 
@@ -200,10 +191,10 @@ export default function AnalysisCertificatePage() {
       hsCode: hsCodeInput.trim(),
       itemDescription: descInput.trim(),
       uom: uomInput.trim() || 'KG',
-      requirementQty: reqQtyInput,
-      wastageQty: wastQtyInput || '0',
-      inputWithWastage: inputWast.toString(),
-      wastagePct: wastPct.toString(),
+      requirementQty: reqNum,
+      wastageQty: wastNum,
+      inputWithWastage: inputWast,
+      wastagePct: wastPct,
     };
 
     setParsedItems(prev => [...prev, newItem]);
@@ -226,13 +217,21 @@ export default function AnalysisCertificatePage() {
 
     setLoading(true);
     try {
+      const sanitizedItems = parsedItems.map(item => ({
+        ...item,
+        requirementQty: reqNumCheck(item.requirementQty),
+        wastageQty: reqNumCheck(item.wastageQty),
+        inputWithWastage: reqNumCheck(item.inputWithWastage),
+        wastagePct: reqNumCheck(item.wastagePct),
+      }));
+
       const res = await fetch('/api/v1/analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           certificateNumber: certNumber,
           partyId: selectedPartyId,
-          items: parsedItems,
+          items: sanitizedItems,
         }),
       });
 
@@ -265,10 +264,10 @@ export default function AnalysisCertificatePage() {
         hsCode: it.hsCode,
         itemDescription: it.itemDescription,
         uom: it.uom,
-        requirementQty: String(it.requirementQty),
-        wastageQty: String(it.wastageQty),
-        inputWithWastage: String(it.inputWithWastage),
-        wastagePct: String(it.wastagePct),
+        requirementQty: reqNumCheck(it.requirementQty),
+        wastageQty: reqNumCheck(it.wastageQty),
+        inputWithWastage: reqNumCheck(it.inputWithWastage),
+        wastagePct: reqNumCheck(it.wastagePct),
       })),
     });
   };
@@ -282,6 +281,14 @@ export default function AnalysisCertificatePage() {
 
     setLoading(true);
     try {
+      const sanitizedItems = editModal.items.map(item => ({
+        ...item,
+        requirementQty: reqNumCheck(item.requirementQty),
+        wastageQty: reqNumCheck(item.wastageQty),
+        inputWithWastage: reqNumCheck(item.inputWithWastage),
+        wastagePct: reqNumCheck(item.wastagePct),
+      }));
+
       const res = await fetch('/api/v1/analysis', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -289,7 +296,7 @@ export default function AnalysisCertificatePage() {
           id: editModal.certId,
           certificateNumber: editModal.certNumber,
           partyId: editModal.partyId,
-          items: editModal.items,
+          items: sanitizedItems,
         }),
       });
 
@@ -310,28 +317,23 @@ export default function AnalysisCertificatePage() {
   };
 
   const handleDeleteCertificate = (id: string, certNo: string) => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Delete Analysis Certificate',
-      message: `Are you sure you want to delete Analysis Certificate: ${certNo}?`,
-      onConfirm: async () => {
-        try {
-          const res = await fetch(`/api/v1/analysis?id=${id}`, { method: 'DELETE' });
-          const result = await res.json();
-          if (result.success) {
-            showNotification('success', 'Analysis Certificate deleted successfully.');
-            fetchPartiesAndCerts();
-          } else {
-            showNotification('error', result.error || 'Failed to delete certificate.');
-          }
-        } catch (err) {
-          console.error(err);
-          showNotification('error', 'Error deleting certificate.');
-        } finally {
-          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+    if (!confirm(`Are you sure you want to delete Analysis Certificate: ${certNo}?`)) return;
+    
+    (async () => {
+      try {
+        const res = await fetch(`/api/v1/analysis?id=${id}`, { method: 'DELETE' });
+        const result = await res.json();
+        if (result.success) {
+          showNotification('success', 'Analysis Certificate deleted successfully.');
+          fetchPartiesAndCerts();
+        } else {
+          showNotification('error', result.error || 'Failed to delete certificate.');
         }
+      } catch (err) {
+        console.error(err);
+        showNotification('error', 'Error deleting certificate.');
       }
-    });
+    })();
   };
 
   const handlePrintCertificate = (certId: string) => {
@@ -848,11 +850,11 @@ export default function AnalysisCertificatePage() {
                               setEditModal(prev => {
                                 const newItems = [...prev.items];
                                 newItems[idx].requirementQty = valStr;
-                                const reqNum = parseFloat(valStr) || 0;
-                                const wastNum = parseFloat(newItems[idx].wastageQty) || 0;
+                                const reqNum = reqNumCheck(valStr);
+                                const wastNum = reqNumCheck(newItems[idx].wastageQty);
                                 const inputWast = reqNum + wastNum;
-                                newItems[idx].inputWithWastage = inputWast.toString();
-                                newItems[idx].wastagePct = inputWast > 0 ? ((wastNum / inputWast) * 100).toString() : '0';
+                                newItems[idx].inputWithWastage = inputWast;
+                                newItems[idx].wastagePct = inputWast > 0 ? (wastNum / inputWast) * 100 : 0;
                                 return { ...prev, items: newItems };
                               });
                             }}
@@ -868,11 +870,11 @@ export default function AnalysisCertificatePage() {
                               setEditModal(prev => {
                                 const newItems = [...prev.items];
                                 newItems[idx].wastageQty = valStr;
-                                const wastNum = parseFloat(valStr) || 0;
-                                const reqNum = parseFloat(newItems[idx].requirementQty) || 0;
+                                const wastNum = reqNumCheck(valStr);
+                                const reqNum = reqNumCheck(newItems[idx].requirementQty);
                                 const inputWast = reqNum + wastNum;
-                                newItems[idx].inputWithWastage = inputWast.toString();
-                                newItems[idx].wastagePct = inputWast > 0 ? ((wastNum / inputWast) * 100).toString() : '0';
+                                newItems[idx].inputWithWastage = inputWast;
+                                newItems[idx].wastagePct = inputWast > 0 ? (wastNum / inputWast) * 100 : 0;
                                 return { ...prev, items: newItems };
                               });
                             }}
