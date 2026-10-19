@@ -92,7 +92,9 @@ export default function InputOutputDetailsPage() {
   const exportVal = Number(selectedExportItem?.valueOfeExports || selectedExportItem?.fobValueVal || selectedExportItem?.fobValue || selectedExportItem?.value || 0);
   const exportGdNumber = selectedExportGdObject?.exportGdNumber || selectedExportGdObject?.gdNumber || selectedExportItem?.exportGdNo || 'N/A';
   const exportDesc = selectedExportItem?.exportParticulars || selectedExportItem?.itemDescription || selectedExportItem?.description || 'Export Item';
-  const exportItemUom = (selectedExportItem?.unit || selectedExportItem?.uom || '').replace(/^u$/i, '').trim();
+  
+  // Robust UOM fallback for export items
+  const exportItemUom = (selectedExportItem?.unit || selectedExportItem?.uom || '').replace(/^u$/i, '').trim() || 'KG';
 
   const firstSelectedCertKey = Object.keys(selectedCertItemsMap)[0];
   const activeCertItem = firstSelectedCertKey ? selectedCertItemsMap[firstSelectedCertKey] : null;
@@ -1062,7 +1064,10 @@ export default function InputOutputDetailsPage() {
                           const hsCode = item.exportHsCode || item.hsCode || 'N/A';
                           const certNo = item.analysisCertNo || 'N/A';
                           const qty = item.qtyOfExports ?? item.quantity ?? 0;
-                          const uom = (item.unit || item.uom || '').replace(/^u$/i, '').trim();
+                          
+                          // Robust fallback UOM for each item row
+                          const uom = (item.unit || item.uom || '').replace(/^u$/i, '').trim() || 'KG';
+                          
                           const val = item.valueOfeExports ?? item.fobValueVal ?? 0;
                           const isItemSel = selectedExportItem?.id === item.id;
 
@@ -1124,7 +1129,7 @@ export default function InputOutputDetailsPage() {
                     Analysis Certificates Detected
                   </span>
                   <h3 className="text-lg sm:text-xl font-black mt-1">
-                    Total Certificates Linked: {parsedCertificateNumbers.length}
+                    Total Certificates Linked: {parsedCertificateNumbers.length}[cite: 8]
                   </h3>
                 </div>
               </div>
@@ -1186,7 +1191,10 @@ export default function InputOutputDetailsPage() {
                                 {certItems.map((item: any, idx: number) => {
                                   const description = item.itemDescription || item.particulars || item.description || 'Certificate Item';
                                   const hsCode = item.hsCode || item.hs_code || 'N/A';
-                                  const uom = item.unit || item.uom || 'KG';
+                                  
+                                  // Robust UOM fallback for certificate items
+                                  const uom = (item.unit || item.uom || '').replace(/^u$/i, '').trim() || 'KG';
+                                  
                                   const qty = item.requirementQty ?? item.quantity ?? 0;
                                   const wastQty = item.wastageQty ?? 0;
                                   const inputWast = item.inputWithWastage ?? (Number(qty) + Number(wastQty));
