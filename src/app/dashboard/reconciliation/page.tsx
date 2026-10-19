@@ -81,6 +81,25 @@ export default function InputOutputDetailsPage() {
     return String(val);
   };
 
+  // Helper for Total Consumed Qty & Value to fix 5 decimal places without rounding off
+  const formatNumberFixed5WithoutRounding = (val: any) => {
+    if (val === null || val === undefined || val === '') return '0.00000';
+    const num = Number(val);
+    if (isNaN(num)) return '0.00000';
+    
+    const parts = num.toString().split('.');
+    const integerPart = parts[0];
+    let decimalPart = parts[1] || '';
+    
+    if (decimalPart.length > 5) {
+      decimalPart = decimalPart.slice(0, 5);
+    } else {
+      decimalPart = decimalPart.padEnd(5, '0');
+    }
+    
+    return `${integerPart}.${decimalPart}`;
+  };
+
   const importItemQty = Number(selectedImportItem?.quantity ?? selectedImportItem?.netWeight ?? 0);
   const importItemVal = Number(selectedImportItem?.importValueVal ?? selectedImportItem?.assessableValue ?? selectedImportItem?.declaredValue ?? selectedImportItem?.value ?? 0);
   const importItemHsCode = selectedImportItem?.hsCode || selectedImportItem?.hs_code || 'N/A';
@@ -1282,12 +1301,12 @@ export default function InputOutputDetailsPage() {
 
           <div className="bg-blue-50 border-2 border-blue-500 ring-2 ring-blue-100 p-4 sm:p-6 rounded-2xl space-y-2">
             <span className="text-xs sm:text-sm text-blue-800 uppercase tracking-wider font-black block">Total Consumed Qty</span>
-            <span className="font-mono font-black text-blue-700 text-lg sm:text-xl block">{formatNumber(totalConsumedQty)} {importItemUom}</span>
+            <span className="font-mono font-black text-blue-700 text-lg sm:text-xl block">{formatNumberFixed5WithoutRounding(totalConsumedQty)} {importItemUom}</span>
           </div>
 
           <div className="bg-slate-50 p-4 sm:p-6 rounded-2xl border-2 border-slate-300 hover:border-blue-500 transition space-y-2">
             <span className="text-xs sm:text-sm text-slate-700 uppercase tracking-wider block font-black">Total Consumed Value</span>
-            <span className="font-mono font-black text-slate-900 text-lg sm:text-xl block">{formatNumber(totalConsumedValue)}</span>
+            <span className="font-mono font-black text-slate-900 text-lg sm:text-xl block">{formatNumberFixed5WithoutRounding(totalConsumedValue)}</span>
           </div>
         </div>
 
