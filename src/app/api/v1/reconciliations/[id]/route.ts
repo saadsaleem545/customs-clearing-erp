@@ -4,9 +4,10 @@ import { Decimal } from '@prisma/client/runtime/library';
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const params = await context.params;
     const { id } = params;
     if (!id) {
       return NextResponse.json({ success: false, error: 'ID is required' }, { status: 400 });
@@ -24,11 +25,13 @@ export async function DELETE(
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const params = await context.params;
     const { id } = params;
     const body = await req.json();
+    
     const { 
       exportQtyKg, 
       exportValuePkr, 
@@ -58,14 +61,15 @@ export async function PUT(
     const totalConsumed = Number(consumptionIncWastage ?? existingItem.consumptionIncWastage?.toString() ?? 0);
     const wastageKg = Number(actualWastageKg ?? existingItem.actualWastageKg?.toString() ?? 0);
 
-    const importQty = Number(importQtyKg ?? existingItem.importQtyKg?.toString() ?? 0);
-    const importVal = Number(importValuePkr ?? existingItem.importValuePkr?.toString() ?? 0);
+    const impQty = Number(importQtyKg ?? existingItem.importQtyKg?.toString() ?? 0);
+    const impVal = Number(importValuePkr ?? existingItem.importValuePkr?.toString() ?? 0);
 
-    const closingBalanceKg = importQty - totalConsumed;
-    const unitRate = importQty > 0 ? importVal / importQty : 0;
+    const closingBalanceKg = impQty - totalConsumed;
+    const unitRate = impQty > 0 ? impVal / impQty : 0;
     const consumedVal = unitRate * totalConsumed;
     const valueAddition = expVal > 0 ? (consumedVal / expVal) * 100 : 0;
 
+    // Direct update without explicit transaction wrapper to avoid timeout errors on Vercel
     const updatedItem = await prisma.reconciliationItem.update({
       where: { id },
       data: {
@@ -75,12 +79,11 @@ export async function PUT(
         actualWastageKg: new Decimal(wastageKg),
         closingBalanceKg: new Decimal(closingBalanceKg),
         valueAddition: new Decimal(valueAddition),
-        // Naye fields jo ab easily update ho sakein ge
         ...(importGdNo !== undefined && { importGdNo }),
         ...(inputDescription !== undefined && { inputDescription }),
         ...(analysisCertNo !== undefined && { analysisCertNo }),
-        ...(importQtyKg !== undefined && { importQtyKg: new Decimal(importQty) }),
-        ...(importValuePkr !== undefined && { importValuePkr: new Decimal(importVal) }),
+        ...(importQtyKg !== undefined && { importQtyKg: new Decimal(impQty) }),
+        ...(importValuePkr !== undefined && { importValuePkr: new Decimal(impVal) }),
       },
     });
 
