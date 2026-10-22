@@ -48,37 +48,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: `Analysis Certificate Number ${certificateNumber} already exists.` }, { status: 400 });
     }
 
-    const newCert = await prisma.$transaction(async (tx) => {
-      return await tx.analysisCertificate.create({
-        data: {
-          certificateNumber: certificateNumber.trim(),
-          partyId,
-          items: {
-            create: items.map((item: any, idx: number) => {
-              const reqQtyStr = String(item.requirementQty ?? '0');
-              const wastQtyStr = String(item.wastageQty ?? '0');
-              
-              const reqQtyNum = Number(reqQtyStr) || 0;
-              const wastQtyNum = Number(wastQtyStr) || 0;
-              
-              const inputWastNum = item.inputWithWastage !== undefined ? Number(item.inputWithWastage) : (reqQtyNum + wastQtyNum);
-              const wastPctNum = item.wastagePct !== undefined ? Number(item.wastagePct) : (inputWastNum > 0 ? (wastQtyNum / inputWastNum) * 100 : 0);
+    const newCert = await prisma.analysisCertificate.create({
+      data: {
+        certificateNumber: certificateNumber.trim(),
+        partyId,
+        items: {
+          create: items.map((item: any, idx: number) => {
+            const reqQtyStr = String(item.requirementQty ?? '0');
+            const wastQtyStr = String(item.wastageQty ?? '0');
+            
+            const reqQtyNum = Number(reqQtyStr) || 0;
+            const wastQtyNum = Number(wastQtyStr) || 0;
+            
+            const inputWastNum = item.inputWithWastage !== undefined ? Number(item.inputWithWastage) : (reqQtyNum + wastQtyNum);
+            const wastPctNum = item.wastagePct !== undefined ? Number(item.wastagePct) : (inputWastNum > 0 ? (wastQtyNum / inputWastNum) * 100 : 0);
 
-              return {
-                serialNo: idx + 1,
-                hsCode: item.hsCode,
-                itemDescription: item.itemDescription,
-                uom: item.uom || 'KG',
-                requirementQty: new Decimal(reqQtyStr),
-                wastageQty: new Decimal(wastQtyStr),
-                inputWithWastage: new Decimal(inputWastNum.toString()),
-                wastagePct: new Decimal(wastPctNum.toString()),
-              };
-            }),
-          },
+            return {
+              serialNo: idx + 1,
+              hsCode: item.hsCode,
+              itemDescription: item.itemDescription,
+              uom: item.uom || 'KG',
+              requirementQty: new Decimal(reqQtyStr),
+              wastageQty: new Decimal(wastQtyStr),
+              inputWithWastage: new Decimal(inputWastNum.toString()),
+              wastagePct: new Decimal(wastPctNum.toString()),
+            };
+          }),
         },
-        include: { items: true, party: true },
-      });
+      },
+      include: { items: true, party: true },
     });
 
     return NextResponse.json({ success: true, data: newCert }, { status: 201 });
@@ -87,7 +85,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// PUT /api/v1/analysis - Update/Edit Analysis Certificate & Matrix items
+// PUT /api/v1/analysis - Update/Edit Analysis Certificate & Matrix items (Optimized to prevent Vercel timeouts)
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
@@ -97,52 +95,51 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Certificate ID, Number, and Items are required for update.' }, { status: 400 });
     }
 
-    const updatedCert = await prisma.$transaction(async (tx) => {
-      // 1. Delete old items
-      await tx.analysisCertItem.deleteMany({
-        where: { analysisCertificateId: id },
-      });
+    // 1. Delete old items first outside complex nested transaction overhead
+    await prisma.analysisCertItem.deleteMany({
+      where: { analysisCertificateId: id },
+    });
 
-      // 2. Update certificate details and create new items matrix with full decimal precision
-      const cert = await tx.analysisCertificate.update({
-        where: { id },
-        data: {
-          certificateNumber: certificateNumber.trim(),
-          partyId,
-          items: {
-            create: items.map((item: any, idx: number) => {
-              const reqQtyStr = String(item.requirementQty ?? '0');
-              const wastQtyStr = String(item.wastageQty ?? '0');
-              
-              const reqQtyNum = Number(reqQtyStr) || 0;
-              const wastQtyNum = Number(wastQtyStr) || 0;
-              
-              const inputWastNum = item.inputWithWastage !== undefined ? Number(item.inputWithWastage) : (reqQtyNum + wastQtyNum);
-              const wastPctNum = item.wastagePct !== undefined ? Number(item.wastagePct) : (inputWastNum > 0 ? (wastQtyNum / inputWastNum) * 100 : 0);
+    // 2. Update certificate and recreate items
+    const updatedCert = await prisma.analysisCertificate.update({
+      where: { id },
+      data: {
+        certificateNumber: certificateNumber.trim(),
+        partyId,
+        items: {
+          create: items.map((item: any, idx: number) => {
+            const reqQtyStr = String(item.requirementQty ?? '0');
+            const wastQtyStr = String(item.wastageQty ?? '0');
+            
+            const reqQtyNum = Number(reqQtyStr) || 0;
+            const wastQtyNum = Number(wastQtyStr) || 0;
+            
+            const inputWastNum = item.inputWithWastage !== undefined ? Number(item.inputWithWastage) : (reqQtyNum + wastQtyNum);
+            const wastPctNum = item.wastagePct !== undefined ? Number(item.wastagePct) : (inputWastNum > 0 ? (wastQtyNum / inputWastNum) * 100 : 0);
 
-              return {
-                serialNo: idx + 1,
-                hsCode: item.hsCode,
-                itemDescription: item.itemDescription,
-                uom: item.uom || 'KG',
-                requirementQty: new Decimal(reqQtyStr),
-                wastageQty: new Decimal(wastQtyStr),
-                inputWithWastage: new Decimal(inputWastNum.toString()),
-                wastagePct: new Decimal(wastPctNum.toString()),
-              };
-            }),
-          },
+            return {
+              serialNo: idx + 1,
+              hsCode: item.hsCode,
+              itemDescription: item.itemDescription,
+              uom: item.uom || 'KG',
+              requirementQty: new Decimal(reqQtyStr),
+              wastageQty: new Decimal(wastQtyStr),
+              inputWithWastage: new Decimal(inputWastNum.toString()),
+              wastagePct: new Decimal(wastPctNum.toString()),
+            };
+          }),
         },
-        include: { items: true, party: true },
-      });
+      },
+      include: { items: true, party: true },
+    });
 
-      // 3. Automatic Synchronization for Saved Reconciliations with Robust Fallback Match
-      for (const newItem of cert.items) {
-        // A. Try matching by Certificate Number and Item Description
-        let updateResult = await tx.reconciliationItem.updateMany({
+    // 3. Lightweight background synchronization without heavy interactive transaction locks
+    for (const newItem of updatedCert.items) {
+      try {
+        const updateResult = await prisma.reconciliationItem.updateMany({
           where: {
             OR: [
-              { analysisCertNo: cert.certificateNumber },
+              { analysisCertNo: updatedCert.certificateNumber },
               { analysisCertNo: certificateNumber.trim() }
             ],
             inputDescription: {
@@ -158,9 +155,8 @@ export async function PUT(req: NextRequest) {
           },
         });
 
-        // B. Fallback: If not found (e.g. due to 'N/A' or missing certificate number), match by Party and Item Description
         if (updateResult.count === 0) {
-          await tx.reconciliationItem.updateMany({
+          await prisma.reconciliationItem.updateMany({
             where: {
               inputDescription: {
                 contains: newItem.itemDescription.trim(),
@@ -171,7 +167,7 @@ export async function PUT(req: NextRequest) {
               },
             },
             data: {
-              analysisCertNo: cert.certificateNumber, // Automatically corrects 'N/A' to correct certificate number
+              analysisCertNo: updatedCert.certificateNumber,
               netIocoConsumption: newItem.requirementQty,
               iocoWastageQty: newItem.wastageQty,
               grossIocoConsumption: newItem.inputWithWastage,
@@ -179,10 +175,10 @@ export async function PUT(req: NextRequest) {
             },
           });
         }
+      } catch (syncErr) {
+        console.error('Reconciliation sync warning:', syncErr);
       }
-
-      return cert;
-    });
+    }
 
     return NextResponse.json({ success: true, data: updatedCert });
   } catch (error: any) {
