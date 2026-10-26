@@ -75,20 +75,23 @@ export default function InputOutputDetailsPage() {
 
   const partyDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Exact unrounded formatNumber function without any rounding
   const formatNumber = (val: any) => {
     if (val === null || val === undefined || val === '') return '0';
-    return String(val);
+    const num = Number(val);
+    if (isNaN(num)) return String(val);
+    
+    return num.toLocaleString('en-US', {
+      maximumFractionDigits: 5,
+    });
   };
 
-  // Helper for Total Consumed Qty & Value to fix 5 decimal places without rounding off
   const formatNumberFixed5WithoutRounding = (val: any) => {
     if (val === null || val === undefined || val === '') return '0.00000';
     const num = Number(val);
     if (isNaN(num)) return '0.00000';
     
     const parts = num.toString().split('.');
-    const integerPart = parts[0];
+    const integerPart = Number(parts[0]).toLocaleString('en-US');
     let decimalPart = parts[1] || '';
     
     if (decimalPart.length > 5) {
@@ -112,7 +115,6 @@ export default function InputOutputDetailsPage() {
   const exportGdNumber = selectedExportGdObject?.exportGdNumber || selectedExportGdObject?.gdNumber || selectedExportItem?.exportGdNo || 'N/A';
   const exportDesc = selectedExportItem?.exportParticulars || selectedExportItem?.itemDescription || selectedExportItem?.description || 'Export Item';
   
-  // Robust UOM fallback for export items
   const exportItemUom = (selectedExportItem?.unit || selectedExportItem?.uom || '').replace(/^u$/i, '').trim() || 'KG';
 
   const firstSelectedCertKey = Object.keys(selectedCertItemsMap)[0];
@@ -130,7 +132,8 @@ export default function InputOutputDetailsPage() {
 
   const unitImportRate = importItemQty > 0 ? (importItemVal / importItemQty) : 0;
   const totalConsumedValue = unitImportRate * totalConsumedQty;
-  const valueAdditionPct = exportVal > 0 ? (totalConsumedValue / exportVal) * 100 : 0;
+  
+  const valueAdditionPct = totalConsumedValue > 0 ? ((exportVal - totalConsumedValue) / totalConsumedValue) * 100 : 0;
 
   const currentPartyObj = parties.find(p => p.id === selectedPartyId);
   const partyEfsCertNo = currentPartyObj?.ntn || currentPartyObj?.companyRegistrationNo || currentPartyObj?.partyCode || 'N/A';
@@ -397,23 +400,41 @@ export default function InputOutputDetailsPage() {
     const printContent = document.getElementById(`statement-table-${groupKey}`);
     if (!printContent) return;
 
-    const WindowPrt = window.open('', '', 'left=0,top=0,width=1200,height=900,toolbar=0,scrollbars=0,status=0');
+    const WindowPrt = window.open('', '', 'left=0,top=0,width=1400,height=900,toolbar=0,scrollbars=0,status=0');
     WindowPrt?.document.write(`
       <html>
         <head>
+          <title>Reconciliation Statement</title>
           <style>
             @media print {
-              @page { size: landscape; margin: 10mm; }
+              @page { size: landscape; margin: 8mm; }
+              body { font-family: Arial, sans-serif; color: #000; padding: 0; margin: 0; }
               .no-print { display: none !important; }
+              table { width: 100% !important; border-collapse: collapse !important; table-layout: fixed !important; font-size: 9px !important; }
+              th, td { border: 1px solid #000 !important; padding: 4px 3px !important; word-wrap: break-word !important; overflow: hidden !important; }
+              th { background-color: #f2f2f2 !important; font-weight: bold !important; text-align: center !important; font-size: 9.5px !important; }
+              
+              /* Proportional column widths for A4 landscape */
+              .col-sno { width: 4% !important; }
+              .col-imp-gd { width: 8% !important; }
+              .col-imp-desc { width: 12% !important; }
+              .col-imp-qty { width: 5% !important; }
+              .col-imp-val { width: 6% !important; }
+              .col-imp-pct { width: 5% !important; }
+              .col-cert { width: 8% !important; }
+              .col-net-ior { width: 5% !important; }
+              .col-wast { width: 4% !important; }
+              .col-gross-ior { width: 5% !important; }
+              .col-wast-pct { width: 4% !important; }
+              .col-exp-gd { width: 8% !important; }
+              .col-exp-desc { width: 13% !important; }
+              .col-exp-qty { width: 5% !important; }
+              .col-exp-val { width: 6% !important; }
+              .col-cons-inc { width: 5% !important; }
+              .col-wast-qty { width: 4% !important; }
+              .col-closing { width: 6% !important; }
+              .col-val-add { width: 5% !important; }
             }
-            body { font-family: Arial, sans-serif; color: #000; padding: 10px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 11px; }
-            th, td { border: 1px solid #333; padding: 6px 8px; text-align: left; }
-            th { background-color: #f2f2f2; font-weight: bold; text-align: center; font-size: 12px; }
-            .text-right { text-align: right; }
-            .text-center { text-align: center; }
-            h2 { text-align: center; margin-bottom: 5px; font-size: 18px; }
-            p { text-align: center; font-size: 13px; color: #555; }
           </style>
         </head>
         <body>
@@ -430,11 +451,11 @@ export default function InputOutputDetailsPage() {
   };
 
   const handlePrintAllFilteredStatements = () => {
-    const WindowPrt = window.open('', '', 'left=0,top=0,width=1200,height=900,toolbar=0,scrollbars=0,status=0');
+    const WindowPrt = window.open('', '', 'left=0,top=0,width=1400,height=900,toolbar=0,scrollbars=0,status=0');
     const allTablesHtml = Object.keys(groupedReconciliations).map(key => {
       const el = document.getElementById(`statement-table-${key}`);
       return el ? el.innerHTML : '';
-    }).join('<hr style="margin: 40px 0; border: 2px dashed #333;" />');
+    }).join('<hr style="margin: 30px 0; border: 2px dashed #000; page-break-after: always;" />');
 
     WindowPrt?.document.write(`
       <html>
@@ -442,22 +463,38 @@ export default function InputOutputDetailsPage() {
           <title>All Filtered EFS Statements</title>
           <style>
             @media print {
-              @page { size: landscape; margin: 10mm; }
+              @page { size: landscape; margin: 8mm; }
+              body { font-family: Arial, sans-serif; color: #000; padding: 0; margin: 0; }
               .no-print { display: none !important; }
+              table { width: 100% !important; border-collapse: collapse !important; table-layout: fixed !important; font-size: 9px !important; }
+              th, td { border: 1px solid #000 !important; padding: 4px 3px !important; word-wrap: break-word !important; overflow: hidden !important; }
+              th { background-color: #f2f2f2 !important; font-weight: bold !important; text-align: center !important; font-size: 9.5px !important; }
+              
+              .col-sno { width: 4% !important; }
+              .col-imp-gd { width: 8% !important; }
+              .col-imp-desc { width: 12% !important; }
+              .col-imp-qty { width: 5% !important; }
+              .col-imp-val { width: 6% !important; }
+              .col-imp-pct { width: 5% !important; }
+              .col-cert { width: 8% !important; }
+              .col-net-ior { width: 5% !important; }
+              .col-wast { width: 4% !important; }
+              .col-gross-ior { width: 5% !important; }
+              .col-wast-pct { width: 4% !important; }
+              .col-exp-gd { width: 8% !important; }
+              .col-exp-desc { width: 13% !important; }
+              .col-exp-qty { width: 5% !important; }
+              .col-exp-val { width: 6% !important; }
+              .col-cons-inc { width: 5% !important; }
+              .col-wast-qty { width: 4% !important; }
+              .col-closing { width: 6% !important; }
+              .col-val-add { width: 5% !important; }
             }
-            body { font-family: Arial, sans-serif; color: #000; padding: 10px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 11px; }
-            th, td { border: 1px solid #333; padding: 6px 8px; text-align: left; }
-            th { background-color: #f2f2f2; font-weight: bold; text-align: center; font-size: 12px; }
-            .text-right { text-align: right; }
-            .text-center { text-align: center; }
-            h2 { text-align: center; margin-bottom: 5px; font-size: 18px; }
-            p { text-align: center; font-size: 13px; color: #555; }
           </style>
         </head>
         <body>
-          <h2>EFS Authorization Certificate Statements Report</h2>
-          <p>From: ${fromDate || 'N/A'} To: ${toDate || 'N/A'}</p>
+          <h3 style="text-align: center; margin-bottom: 5px; font-size: 16px;">EFS Authorization Certificate Statements Report</h3>
+          <p style="text-align: center; font-size: 11px; margin-bottom: 20px;">From: ${fromDate || 'N/A'} To: ${toDate || 'N/A'}</p>
           ${allTablesHtml}
         </body>
       </html>
@@ -1083,10 +1120,7 @@ export default function InputOutputDetailsPage() {
                           const hsCode = item.exportHsCode || item.hsCode || 'N/A';
                           const certNo = item.analysisCertNo || 'N/A';
                           const qty = item.qtyOfExports ?? item.quantity ?? 0;
-                          
-                          // Robust fallback UOM for each item row
                           const uom = (item.unit || item.uom || '').replace(/^u$/i, '').trim() || 'KG';
-                          
                           const val = item.valueOfeExports ?? item.fobValueVal ?? 0;
                           const isItemSel = selectedExportItem?.id === item.id;
 
@@ -1148,7 +1182,7 @@ export default function InputOutputDetailsPage() {
                     Analysis Certificates Detected
                   </span>
                   <h3 className="text-lg sm:text-xl font-black mt-1">
-                    Total Certificates Linked: {parsedCertificateNumbers.length}[cite: 8]
+                    Total Certificates Linked: {parsedCertificateNumbers.length}
                   </h3>
                 </div>
               </div>
@@ -1210,10 +1244,7 @@ export default function InputOutputDetailsPage() {
                                 {certItems.map((item: any, idx: number) => {
                                   const description = item.itemDescription || item.particulars || item.description || 'Certificate Item';
                                   const hsCode = item.hsCode || item.hs_code || 'N/A';
-                                  
-                                  // Robust UOM fallback for certificate items
                                   const uom = (item.unit || item.uom || '').replace(/^u$/i, '').trim() || 'KG';
-                                  
                                   const qty = item.requirementQty ?? item.quantity ?? 0;
                                   const wastQty = item.wastageQty ?? 0;
                                   const inputWast = item.inputWithWastage ?? (Number(qty) + Number(wastQty));
@@ -1512,7 +1543,29 @@ export default function InputOutputDetailsPage() {
                 </div>
 
                 <div id={`statement-table-${groupKey}`} className="overflow-x-auto border-2 border-slate-300 rounded-2xl shadow-sm bg-white">
-                  <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
+                  <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm" style={{ tableLayout: 'fixed' }}>
+                    <colgroup>
+                      <col className="col-sno" />
+                      <col className="col-imp-gd" />
+                      <col className="col-imp-desc" />
+                      <col className="col-imp-qty" />
+                      <col className="col-imp-val" />
+                      <col className="col-imp-pct" />
+                      <col className="col-cert" />
+                      <col className="col-net-ior" />
+                      <col className="col-wast" />
+                      <col className="col-gross-ior" />
+                      <col className="col-wast-pct" />
+                      <col className="col-exp-gd" />
+                      <col className="col-exp-desc" />
+                      <col className="col-exp-qty" />
+                      <col className="col-exp-val" />
+                      <col className="col-cons-inc" />
+                      <col className="col-wast-qty" />
+                      <col className="col-closing" />
+                      <col className="col-val-add" />
+                      <col className="no-print" style={{ width: '50px' }} />
+                    </colgroup>
                     <thead>
                       <tr className="bg-slate-100 border-b border-slate-200">
                         <th colSpan={20} className="py-4 px-4 text-center text-slate-900 font-black text-base sm:text-xl tracking-wider uppercase">
@@ -1535,63 +1588,63 @@ export default function InputOutputDetailsPage() {
                       </tr>
 
                       <tr className="bg-slate-100 text-slate-800 font-black uppercase text-[11px] sm:text-xs tracking-wider text-left border-b border-slate-200">
-                        <th className="px-3 py-3.5 text-center w-12">S. No.</th>
-                        <th className="px-3 py-3.5">Import GD No.</th>
-                        <th className="px-3 py-3.5">Input Description</th>
-                        <th className="px-3 py-3.5 text-right">Import Qty</th>
-                        <th className="px-3 py-3.5 text-right">Import Value</th>
-                        <th className="px-3 py-3.5">Input PCT</th>
-                        <th className="px-3 py-3.5">Analysis Certificate No.</th>
-                        <th className="px-3 py-3.5 text-right">Consumption As per IOCO (Net IOR)</th>
-                        <th className="px-3 py-3.5 text-right">Wastages</th>
-                        <th className="px-3 py-3.5 text-right">Total Consumption (Gross IOR)</th>
-                        <th className="px-3 py-3.5 text-right">%age of Wastage</th>
-                        <th className="px-3 py-3.5">Export GD No.</th>
-                        <th className="px-3 py-3.5">Export Description</th>
-                        <th className="px-3 py-3.5 text-right">Export Qty</th>
-                        <th className="px-3 py-3.5 text-right">Export value (Rs.)</th>
-                        <th className="px-3 py-3.5 text-right">Consumption including wastage</th>
-                        <th className="px-3 py-3.5 text-right">Wastages</th>
-                        <th className="px-3 py-3.5 text-right">Closing Balance</th>
-                        <th className="px-3 py-3.5 text-right">Value Addition</th>
-                        <th className="px-3 py-3.5 text-center no-print">ACTIONS</th>
+                        <th className="px-2 py-3.5 text-center col-sno">S. No.</th>
+                        <th className="px-3 py-3.5 col-imp-gd">Import GD No.</th>
+                        <th className="px-3 py-3.5 col-imp-desc">Input Description</th>
+                        <th className="px-2 py-3.5 text-right col-imp-qty">Import Qty</th>
+                        <th className="px-2 py-3.5 text-right col-imp-val">Import Value</th>
+                        <th className="px-2 py-3.5 col-imp-pct">Input PCT</th>
+                        <th className="px-3 py-3.5 col-cert">Analysis Certificate No.</th>
+                        <th className="px-2 py-3.5 text-right col-net-ior">Consumption As per IOCO (Net IOR)</th>
+                        <th className="px-2 py-3.5 text-right col-wast">Wastages</th>
+                        <th className="px-2 py-3.5 text-right col-gross-ior">Total Consumption (Gross IOR)</th>
+                        <th className="px-2 py-3.5 text-right col-wast-pct">% of Wastage</th>
+                        <th className="px-3 py-3.5 col-exp-gd">Export GD No.</th>
+                        <th className="px-3 py-3.5 col-exp-desc">Export Description</th>
+                        <th className="px-2 py-3.5 text-right col-exp-qty">Export Qty</th>
+                        <th className="px-2 py-3.5 text-right col-exp-val">Export value (Rs.)</th>
+                        <th className="px-2 py-3.5 text-right col-cons-inc">Consumption including wastage</th>
+                        <th className="px-2 py-3.5 text-right col-wast-qty">Wastages</th>
+                        <th className="px-2 py-3.5 text-right col-closing">Closing Balance</th>
+                        <th className="px-2 py-3.5 text-right col-val-add">Value Addition</th>
+                        <th className="px-2 py-3.5 text-center no-print">ACTIONS</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 text-slate-900 font-medium">
                       {rows.map((rec: any, idx: number) => (
                         <tr key={rec.id || idx} className="hover:bg-slate-50 transition">
-                          <td className="px-3 py-3.5 text-center font-bold text-slate-700">{idx + 1}</td>
-                          <td className="px-3 py-3.5 font-mono font-black text-blue-700">
+                          <td className="px-2 py-3.5 text-center font-bold text-slate-700">{idx + 1}</td>
+                          <td className="px-3 py-3.5 font-mono font-black text-blue-700 truncate">
                             {idx === 0 ? (rec.importGdNo || importGdNo) : ''}
                           </td>
-                          <td className="px-3 py-3.5 font-black text-slate-900">
+                          <td className="px-3 py-3.5 font-black text-slate-900 break-words">
                             {idx === 0 ? (rec.importParticulars || rec.inputDescription || itemDesc) : ''}
                           </td>
-                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">
+                          <td className="px-2 py-3.5 text-right font-mono font-black text-slate-900">
                             {idx === 0 ? formatNumber(rec.importQty || rec.importQtyKg || 0) : ''}
                           </td>
-                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">
+                          <td className="px-2 py-3.5 text-right font-mono font-black text-slate-900">
                             {idx === 0 ? formatNumber(rec.importValue || rec.importValuePkr || 0) : ''}
                           </td>
-                          <td className="px-3 py-3.5 font-mono font-black text-slate-800">
+                          <td className="px-2 py-3.5 font-mono font-black text-slate-800">
                             {idx === 0 ? (rec.importHsCode || rec.inputPct || 'N/A') : ''}
                           </td>
-                          <td className="px-3 py-3.5 font-mono font-black text-slate-800">
+                          <td className="px-3 py-3.5 font-mono font-black text-slate-800 truncate">
                             {rec.analysisCertNo || 'N/A'}
                           </td>
-                          <td className="px-3 py-3.5 text-right font-mono font-black text-blue-700">{formatNumber(rec.requirementQty || rec.netIocoConsumption || 0)}</td>
-                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-700">{formatNumber(rec.wastageQty || rec.iocoWastageQty || 0)}</td>
-                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.grossIocoConsumption || rec.inputWithWastage || 0)}</td>
-                          <td className="px-3 py-3.5 text-right font-mono font-black text-emerald-700">{formatNumber(rec.wastagePct || rec.wastagePercentage || 0)}%</td>
-                          <td className="px-3 py-3.5 font-mono font-black text-blue-700">{rec.exportGdNo || 'N/A'}</td>
-                          <td className="px-3 py-3.5 font-black text-slate-900">{rec.exportDescription || 'Export Item'}</td>
-                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.resolvedExportQty)} {rec.uom || ''}</td>
-                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.exportValuePkr || 0)}</td>
-                          <td className="px-3 py-3.5 text-right font-mono font-black text-blue-700">{formatNumber(rec.resolvedTotalConsumed)}</td>
-                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-700">{formatNumber(rec.resolvedWastageQty)}</td>
-                          <td className="px-3 py-3.5 text-right font-mono font-black text-emerald-700">{formatNumber(rec.computedClosingBalance)}</td>
-                          <td className="px-3 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.valueAddition || 0)}%</td>
-                          <td className="px-3 py-3.5 text-center no-print">
+                          <td className="px-2 py-3.5 text-right font-mono font-black text-blue-700">{formatNumber(rec.requirementQty || rec.netIocoConsumption || 0)}</td>
+                          <td className="px-2 py-3.5 text-right font-mono font-black text-slate-700">{formatNumber(rec.wastageQty || rec.iocoWastageQty || 0)}</td>
+                          <td className="px-2 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.grossIocoConsumption || rec.inputWithWastage || 0)}</td>
+                          <td className="px-2 py-3.5 text-right font-mono font-black text-emerald-700">{formatNumber(rec.wastagePct || rec.wastagePercentage || 0)}%</td>
+                          <td className="px-3 py-3.5 font-mono font-black text-blue-700 truncate">{rec.exportGdNo || 'N/A'}</td>
+                          <td className="px-3 py-3.5 font-black text-slate-900 break-words">{rec.exportDescription || 'Export Item'}</td>
+                          <td className="px-2 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.resolvedExportQty)} {rec.uom || ''}</td>
+                          <td className="px-2 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.exportValuePkr || 0)}</td>
+                          <td className="px-2 py-3.5 text-right font-mono font-black text-blue-700">{formatNumber(rec.resolvedTotalConsumed)}</td>
+                          <td className="px-2 py-3.5 text-right font-mono font-black text-slate-700">{formatNumber(rec.resolvedWastageQty)}</td>
+                          <td className="px-2 py-3.5 text-right font-mono font-black text-emerald-700">{formatNumber(rec.computedClosingBalance)}</td>
+                          <td className="px-2 py-3.5 text-right font-mono font-black text-slate-900">{formatNumber(rec.valueAddition || 0)}%</td>
+                          <td className="px-2 py-3.5 text-center no-print">
                             <div className="flex items-center justify-center gap-2">
                               <button
                                 type="button"
