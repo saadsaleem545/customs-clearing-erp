@@ -117,15 +117,16 @@ export default function InputOutputDetailsPage() {
   
   const exportItemUom = (selectedExportItem?.unit || selectedExportItem?.uom || '').replace(/^u$/i, '').trim() || 'KG';
 
-  const firstSelectedCertKey = Object.keys(selectedCertItemsMap)[0];
-  const activeCertItem = firstSelectedCertKey ? selectedCertItemsMap[firstSelectedCertKey] : null;
+  // Multi-certificate active item resolution across any card
+  const activeCertItemKey = Object.keys(selectedCertItemsMap).find(key => selectedCertItemsMap[key] !== null && selectedCertItemsMap[key] !== undefined);
+  const activeCertItem = activeCertItemKey ? selectedCertItemsMap[activeCertItemKey] : null;
 
   const certReqQty = Number(activeCertItem?.requirementQty ?? activeCertItem?.quantity ?? 0);
   const certWastQtyPerUnit = Number(activeCertItem?.wastageQty ?? 0); 
   const certInputWithWastage = Number(activeCertItem?.inputWithWastage ?? (certReqQty + certWastQtyPerUnit));
   const certWastagePct = Number(activeCertItem?.wastagePct ?? 0);
   
-  const currentCertNumber = firstSelectedCertKey || selectedExportItem?.analysisCertNo || 'N/A';
+  const currentCertNumber = activeCertItemKey || parsedCertificateNumbers[0] || selectedExportItem?.analysisCertNo || 'N/A';
   
   const totalConsumedQty = exportQty * certInputWithWastage;
   const totalWastageQty = certWastQtyPerUnit * exportQty; 
@@ -135,9 +136,28 @@ export default function InputOutputDetailsPage() {
   
   const valueAdditionPct = totalConsumedValue > 0 ? ((exportVal - totalConsumedValue) / totalConsumedValue) * 100 : 0;
 
-  const currentPartyObj = parties.find(p => p.id === selectedPartyId);
-  const partyEfsCertNo = currentPartyObj?.ntn || currentPartyObj?.companyRegistrationNo || currentPartyObj?.partyCode || 'N/A';
-  const currentPartyNameText = currentPartyObj?.companyName || selectedPartyName || 'VALUED CLIENT';
+  // --- ROBUST PARTY & CERTIFICATE RESOLUTION LOGIC ---
+  const currentPartyObj = parties.find(p => p.id === selectedPartyId || p.id === partyReconciliations[0]?.partyId || p.id === partyReconciliations[0]?.party?.id);
+
+  const currentPartyNameText = 
+    partyReconciliations[0]?.reconciliation?.party?.companyName || 
+    partyReconciliations[0]?.party?.companyName || 
+    partyReconciliations[0]?.companyName || 
+    currentPartyObj?.companyName || 
+    selectedPartyName || 
+    (filterPartyId !== 'ALL' ? parties.find(p => p.id === filterPartyId)?.companyName : '') || 
+    'VALUED CLIENT';
+
+  const partyEfsCertNo = 
+    partyReconciliations[0]?.reconciliation?.party?.ntn || 
+    partyReconciliations[0]?.party?.ntn || 
+    partyReconciliations[0]?.ntn || 
+    currentPartyObj?.ntn || 
+    currentPartyObj?.companyRegistrationNo || 
+    currentPartyObj?.partyCode || 
+    (filterPartyId !== 'ALL' ? parties.find(p => p.id === filterPartyId)?.ntn : '') || 
+    'N/A';
+  // ----------------------------------------------------
 
   const currentGdReconciliations = useMemo(() => {
     if (!currentGdNumber || currentGdNumber === 'N/A') return partyReconciliations;
@@ -276,7 +296,7 @@ export default function InputOutputDetailsPage() {
             throw new Error((result as any)?.error || 'Failed to clear reconciliations');
           }
 
-          setPartyReconciliations(prev => prev.filter(r => r.partyId !== targetParty));
+          setPartyReconciliations(prev => prev.filter(r => String(r.partyId || r.party?.id) !== String(targetParty)));
           showToast('All reconciliations have been successfully cleared.');
         } catch (err: any) {
           console.error('Error clearing reconciliations:', err);
@@ -414,7 +434,6 @@ export default function InputOutputDetailsPage() {
               th, td { border: 1px solid #000 !important; padding: 4px 3px !important; word-wrap: break-word !important; overflow: hidden !important; }
               th { background-color: #f2f2f2 !important; font-weight: bold !important; text-align: center !important; font-size: 9.5px !important; }
               
-              /* Proportional column widths for A4 landscape */
               .col-sno { width: 4% !important; }
               .col-imp-gd { width: 8% !important; }
               .col-imp-desc { width: 12% !important; }
@@ -700,10 +719,7 @@ export default function InputOutputDetailsPage() {
 
           if (matchedCert) {
             certsMap[certNo] = matchedCert;
-            const cItems = matchedCert.items || matchedCert.certificateItems || [];
-            if (cItems.length > 0) {
-              selectedMap[certNo] = cItems[0];
-            }
+            selectedMap[certNo] = null;
           }
         }
 
@@ -718,7 +734,10 @@ export default function InputOutputDetailsPage() {
   };
 
   const handleSelectCertItemForCert = (certNo: string, item: any) => {
-    setSelectedCertItemsMap(prev => ({ ...prev, [certNo]: item }));
+    setSelectedCertItemsMap(prev => ({
+      ...prev,
+      [certNo]: prev[certNo]?.id === item.id ? null : item
+    }));
   };
 
   const handleClearImportTable = () => {
@@ -738,8 +757,25 @@ export default function InputOutputDetailsPage() {
     const map: { [key: string]: any[] } = {};
     
     partyReconciliations.forEach((rec: any) => {
-      if (filterPartyId !== 'ALL' && rec.partyId !== filterPartyId) {
-        return;
+      if (filterPartyId !== 'ALL') {
+        const recPartyId = String(rec.partyId || rec.reconciliation?.partyId || rec.party?.id || '').trim();
+        const selectedPartyIdStr = String(filterPartyId || '').trim();
+        
+        const selectedPartyObj = parties.find(p => p.id === filterPartyId);
+        const selectedPartyNameText = (selectedPartyObj?.companyName || '').toLowerCase();
+        
+        const recPartyNameText = String(
+          rec.reconciliation?.party?.companyName || 
+          rec.party?.companyName || 
+          rec.companyName || ''
+        ).toLowerCase();
+
+        const isIdMatch = recPartyId && selectedPartyIdStr && recPartyId === selectedPartyIdStr;
+        const isNameMatch = selectedPartyNameText && recPartyNameText && recPartyNameText.includes(selectedPartyNameText);
+
+        if (!isIdMatch && !isNameMatch) {
+          return;
+        }
       }
 
       const recDateStr = rec.createdAt || rec.date || rec.updatedAt;
@@ -765,7 +801,7 @@ export default function InputOutputDetailsPage() {
       map[uniqueGroupKey].push(rec);
     });
     return map;
-  }, [partyReconciliations, filterPartyId, fromDate, toDate, statementsSearchQuery]);
+  }, [partyReconciliations, filterPartyId, fromDate, toDate, statementsSearchQuery, parties]);
 
   const groupKeysArray = useMemo(() => Object.keys(groupedReconciliations), [groupedReconciliations]);
   const totalPages = Math.ceil(groupKeysArray.length / itemsPerPage);

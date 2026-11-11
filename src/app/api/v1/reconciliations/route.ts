@@ -10,7 +10,8 @@ export async function GET(req: NextRequest) {
 
     const where: any = {};
     if (partyId && partyId !== 'ALL') {
-      where.reconciliation = { partyId };
+      // Direct parent reconciliation ki partyId par filter lagayein
+      where.reconciliation = { partyId: partyId };
     }
 
     const items = await prisma.reconciliationItem.findMany({
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const {
       partyId,
-      importMaterialId, // Yeh frontend se aa rahi ID hai (jo ImportGdItem ki ID bhi ho sakti hai)
+      importMaterialId,
       exportGdId,
       exportQtyKg,
       exportValuePkr,
@@ -77,16 +78,12 @@ export async function POST(req: NextRequest) {
       ? 'Import Material Item' 
       : importParticulars;
 
-    // --- FIX: Ensure a valid InputMaterial record exists ---
-    // Pehle check karein ke aaya yeh ID seedhe 'input_materials' mein mojood hai ya nahi
     let validInputMaterialId = importMaterialId;
     let existingInputMaterial = await prisma.inputMaterial.findUnique({
       where: { id: importMaterialId }
     });
 
     if (!existingInputMaterial) {
-      // Agar yeh ID 'input_materials' mein nahi mili, toh ho sakta hai yeh 'ImportGdItem' ki ID ho.
-      // Hum check karte hain ke kya is ImportGdItem ke against koi InputMaterial pehle se hai?
       existingInputMaterial = await prisma.inputMaterial.findFirst({
         where: { importGdItemId: importMaterialId }
       });
@@ -94,12 +91,10 @@ export async function POST(req: NextRequest) {
       if (existingInputMaterial) {
         validInputMaterialId = existingInputMaterial.id;
       } else {
-        // Agar bilkul bhi nahi mili, toh hum aik naya InputMaterial record automatically create kar dete hain
-        // Taa ke foreign key constraint violate na ho!
         const newCreatedInputMat = await prisma.inputMaterial.create({
           data: {
             partyId: partyId,
-            importGdItemId: importMaterialId, // Agar importMaterialId ek valid ImportGdItem id hai
+            importGdItemId: importMaterialId,
             pctCode: importHsCode || 'N/A',
             description: finalDescription,
             importedQty: new Decimal(importQty || 0),
@@ -112,7 +107,6 @@ export async function POST(req: NextRequest) {
         validInputMaterialId = newCreatedInputMat.id;
       }
     }
-    // -----------------------------------------------------
 
     let parentRecon = await prisma.reconciliation.findFirst({
       where: { partyId, overallStatus: 'PENDING' }
@@ -137,7 +131,7 @@ export async function POST(req: NextRequest) {
     const newItem = await prisma.reconciliationItem.create({
       data: {
         reconciliationId: parentRecon.id,
-        inputMaterialId: validInputMaterialId, // Ab yahan 100% valid InputMaterial ID jayegi
+        inputMaterialId: validInputMaterialId,
         exportGdId: exportGdId || null,
         importGdNo: finalImportGdNo,
         inputDescription: finalDescription,

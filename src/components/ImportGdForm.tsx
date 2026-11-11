@@ -15,6 +15,9 @@ export default function ImportGdForm() {
   const [message, setMessage] = useState('');
   const [historySearch, setHistorySearch] = useState('');
 
+  // Editing State
+  const [editingGdId, setEditingGdId] = useState<string | null>(null);
+
   // Pagination States
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -251,7 +254,30 @@ export default function ImportGdForm() {
     setManualGdNumber('');
     setManualGdDate('');
     setManualItems([{ description: '', hsCode: '', quantity: '', uom: 'KG', assessableValue: '' }]);
+    setEditingGdId(null);
     setActiveTab('auto');
+  };
+
+  const handleEditRecord = (rec: any) => {
+    setEditingGdId(rec.id);
+    setSelectedManualPartyId(rec.partyId || rec.party?.id || '');
+    setManualGdNumber(rec.gdNumber || '');
+    setManualGdDate(rec.gdDate ? new Date(rec.gdDate).toISOString().split('T')[0] : '');
+    
+    if (rec.items && rec.items.length > 0) {
+      setManualItems(rec.items.map((it: any) => ({
+        description: it.itemDescription || '',
+        hsCode: it.hsCode || '',
+        quantity: String(it.quantity || ''),
+        uom: it.unit || it.uom || 'KG',
+        assessableValue: String(it.importValueVal || it.assessableValue || ''),
+      })));
+    } else {
+      setManualItems([{ description: '', hsCode: '', quantity: '', uom: 'KG', assessableValue: '' }]);
+    }
+
+    setActiveTab('manual');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSaveManualImport = async (e: React.FormEvent) => {
@@ -284,18 +310,21 @@ export default function ImportGdForm() {
         }))
       };
 
-      const response = await fetch('/api/v1/imports', {
-        method: 'POST',
+      const endpoint = editingGdId ? `/api/v1/imports/${editingGdId}` : '/api/v1/imports';
+      const method = editingGdId ? 'PUT' : 'POST';
+
+      const response = await fetch(endpoint, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
       const result = await response.json();
       if (!result.success) {
-        throw new Error(result.error || 'Failed to save manual import GD');
+        throw new Error(result.error || 'Failed to save import GD');
       }
 
-      showNotification('success', `Import GD: ${manualGdNumber} saved successfully via manual entry!`);
+      showNotification('success', `Import GD: ${manualGdNumber} ${editingGdId ? 'updated' : 'saved'} successfully!`);
       handleCancelManual();
       fetchData();
     } catch (err: any) {
@@ -496,7 +525,6 @@ export default function ImportGdForm() {
     return searchCondition && partyIdMatch && dateMatch;
   });
 
-  // Pagination calculation for filtered imports
   const totalPages = Math.ceil(filteredImports.length / itemsPerPage);
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -572,10 +600,10 @@ export default function ImportGdForm() {
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('manual')}
+              onClick={() => { setEditingGdId(null); setActiveTab('manual'); }}
               className={`flex-1 sm:flex-none px-4 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-2 shadow cursor-pointer ${activeTab === 'manual' ? 'bg-blue-600 text-white shadow-blue-600/30' : 'bg-blue-900/80 text-blue-200 hover:bg-blue-800 border border-blue-600/40'}`}
             >
-              <Edit3 className="w-4 h-4" /> Manual Entry Form
+              <Edit3 className="w-4 h-4" /> {editingGdId ? 'Edit Mode Active' : 'Manual Entry Form'}
             </button>
           </div>
         </div>
@@ -664,7 +692,7 @@ export default function ImportGdForm() {
               <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl border border-blue-200">
                 <Edit3 className="w-5 h-5" />
               </div>
-              Manual Import GD &amp; Items Entry Form
+              {editingGdId ? `Edit Import GD (${manualGdNumber})` : 'Manual Import GD & Items Entry Form'}
             </h2>
             <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
               <button
@@ -804,7 +832,7 @@ export default function ImportGdForm() {
               className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs sm:text-sm uppercase tracking-wider py-3.5 sm:py-4 rounded-2xl transition shadow-xl shadow-blue-600/25 flex items-center justify-center gap-2 cursor-pointer"
             >
               {isSavingManual ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-              {isSavingManual ? 'Saving Manual GD...' : 'Save Manual Import GD'}
+              {isSavingManual ? (editingGdId ? 'Updating GD...' : 'Saving Manual GD...') : (editingGdId ? 'Update Import GD' : 'Save Manual Import GD')}
             </button>
             <button
               type="button"
@@ -828,7 +856,6 @@ export default function ImportGdForm() {
 
         {/* Filter Controls Bar */}
         <div className="bg-slate-50 border-2 border-slate-300 p-4 sm:p-5 rounded-2xl flex flex-wrap items-end gap-4 shadow-sm">
-          {/* Search GD Number Input Field Added Here */}
           <div className="flex-1 min-w-[220px] space-y-1.5">
             <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700">Search GD Number</label>
             <input
@@ -927,7 +954,13 @@ export default function ImportGdForm() {
                             onClick={() => setSelectedGdItems({ items: rec.items, gdNumber: rec.gdNumber, partyName: rec.party?.companyName})}
                             className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase tracking-wider px-3.5 py-2 rounded-xl transition cursor-pointer shadow"
                           >
-                            View Items
+                            View
+                          </button>
+                          <button
+                            onClick={() => handleEditRecord(rec)}
+                            className="bg-amber-500 hover:bg-amber-600 text-white text-xs font-black uppercase tracking-wider px-3.5 py-2 rounded-xl transition cursor-pointer shadow"
+                          >
+                            Edit
                           </button>
                           <button
                             onClick={() => handleDelete(rec.id, rec.gdNumber)}
